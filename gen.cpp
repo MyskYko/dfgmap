@@ -283,7 +283,8 @@ int main(int argc, char** argv) {
   string efilename = "e.txt";
   string ffilename = "f.txt";
   int ncycle = 0;
-  string plfilename;
+  string pfilename;
+  string cfilename;
   int fcompress = 0;
   int fmac = 0;
   int fexmem = 0;
@@ -320,7 +321,14 @@ int main(int argc, char** argv) {
 	  show_error("-p must be followed by file name");
 	  return 1;
 	}
-	plfilename = argv[++i];
+	pfilename = argv[++i];
+	break;
+      case 'w':
+	if(i+1 >= argc) {
+	  show_error("-w must be followed by file name");
+	  return 1;
+	}
+	cfilename = argv[++i];
 	break;
       case 'c':
 	fcompress = 1;
@@ -328,7 +336,7 @@ int main(int argc, char** argv) {
       case 'm':
 	fmac = 1;
 	break;
-      case 't':
+      case 'x':
 	fexmem = 1;
 	break;
       case 'v':
@@ -344,7 +352,20 @@ int main(int argc, char** argv) {
 	}
 	break;
       case 'h':
-	cout << "usage : tobe constructed" << endl;
+	cout << "usage : gen <options>" << endl;
+	cout << "\t-h       : show this usage" << endl;
+	cout << "\t-n <int> : the number of cycles [default = " << ncycle << "]" << endl;
+	cout << "\t-e <str> : the name of environment file [default = \"" << efilename << "\"]" << endl;
+	cout << "\t-f <str> : the name of formula file [default = \"" << ffilename << "\"]" << endl;
+	cout << "\t-p <str> : the name of placement file to generate pngs [default = \"" << pfilename << "\"]" << endl;
+	cout << "\t-w <str> : the name of cnf file to dump without sysnthesis [default = \"" << cfilename << "\"]" << endl;
+	cout << "\t-c       : toggle transforming dataflow [default = " << fcompress << "]" << endl;
+	cout << "\t-m       : toggle using MAC operation [default = " << fmac << "]" << endl;
+	cout << "\t-x       : toggle using external memory to store intermediate data [default = " << fexmem << "]" << endl;
+	cout << "\t-v <int> : toggle verbosing information [default = " << nverbose << "]" << endl;
+	cout << "\t           \t0 : nothing" << endl;
+	cout << "\t           \t1 : results" << endl;
+	cout << "\t           \t2 : settings and results" << endl;
 	return 0;
       default:
 	show_error("invalid option " + string(argv[i]));
@@ -706,6 +727,12 @@ int main(int argc, char** argv) {
     S.addClause(l);
   }
 
+  // write out cnf file
+  if(!cfilename.empty()) {
+    S.toDimacs(cfilename.c_str());
+    return 0;
+  }
+  
   // run sat solver
   clock_t start = clock();
   bool r = S.solve();
@@ -748,7 +775,7 @@ int main(int argc, char** argv) {
   }
 
   // prepare for image generation
-  if(plfilename.empty()) {
+  if(pfilename.empty()) {
     return 0;
   }
 
@@ -765,13 +792,13 @@ int main(int argc, char** argv) {
   }
 
   // read placement file
-  ifstream plfile(plfilename);
-  if(!plfile) {
+  ifstream pfile(pfilename);
+  if(!pfile) {
     show_error("cannot open placement file");
     return 1;
   }
   vector<vector<string> > pl;
-  while(getline(plfile, str)) {
+  while(getline(pfile, str)) {
     string s;
     stringstream ss(str);
     vector<string> vs;
@@ -780,7 +807,7 @@ int main(int argc, char** argv) {
     }
     pl.push_back(vs);
   }
-  plfile.close();
+  pfile.close();
 
   // generate image
   for(int i = 0; i < ncycle; i++) {
