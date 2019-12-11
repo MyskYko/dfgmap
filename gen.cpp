@@ -44,11 +44,9 @@ opnode * create_opnode(vector<string> &vs, int &pos, map<string, opnode *> &inpu
   p->id = -1;
   if(vs[pos] == "+") {
     p->type = 1;
-  }
-  else if(vs[pos] == "*") {
+  } else if(vs[pos] == "*") {
     p->type = 2;
-  }
-  else {
+  } else {
     assert(0);
   }
   opnode * l = create_opnode(vs, ++pos, input_name2opnode);
@@ -70,11 +68,9 @@ void print_opnode(opnode * p, int depth) {
   }
   if(p->type == 0) {
     cout << p->id << endl;
-  }
-  else if(p->type == 1) {
+  } else if(p->type == 1) {
     cout << "+" << endl;
-  }
-  else if(p->type == 2) {
+  } else if(p->type == 2) {
     cout << "*" << endl;
   }
   for(auto c : p->vc) {
@@ -94,8 +90,7 @@ void compress_opnode(opnode * p) {
 	p->vc.push_back(cc);
       }
       delete c;
-    }
-    else {
+    } else {
       vcn.push_back(c);
     }
   }
@@ -153,8 +148,7 @@ void gen_operands(opnode * p, int &ndata, vector<set<set<int> > > &operands, map
 				       for(int k = 0; k < i; k++) {
 					 if(j_ % 2) {
 					   a.push_back(p->vc[indexes[k]]);
-					 }
-					 else {
+					 } else {
 					   b.push_back(p->vc[indexes[k]]);
 					 }
 					 j_ = j_ >> 1;
@@ -171,14 +165,12 @@ void gen_operands(opnode * p, int &ndata, vector<set<set<int> > > &operands, map
 				       pair<int, multiset<int> > keyb = make_pair(p->type, bs);
 				       if(a.size() == 1) {
 					 s.insert(a[0]->id);
-				       }
-				       else {
+				       } else {
 					 s.insert(unique[keya]);
 				       }
 				       if(b.size() == 1) {
 					 s.insert(b[0]->id);
-				       }
-				       else {
+				       } else {
 					 s.insert(unique[keyb]);
 				       }
 				       ss.insert(s);
@@ -192,8 +184,7 @@ void gen_operands(opnode * p, int &ndata, vector<set<set<int> > > &operands, map
 					     }
 					     if(b.size() == 1) {
 					       s.insert(b[0]->id);
-					     }
-					     else {
+					     } else {
 					       s.insert(unique[keyb]);
 					     }
 					     ss.insert(s);
@@ -207,8 +198,7 @@ void gen_operands(opnode * p, int &ndata, vector<set<set<int> > > &operands, map
 					     }
 					     if(a.size() == 1) {
 					       s.insert(a[0]->id);
-					     }
-					     else {
+					     } else {
 					       s.insert(unique[keya]);
 					     }
 					     ss.insert(s);
@@ -222,8 +212,7 @@ void gen_operands(opnode * p, int &ndata, vector<set<set<int> > > &operands, map
 				       dataname += datanames[id];
 				       if(p->type == 1) {
 					 dataname += " + ";
-				       }
-				       else if(p->type == 2) {
+				       } else if(p->type == 2) {
 					 dataname += " * ";
 				       }
 				     }
@@ -393,22 +382,19 @@ int main(int argc, char** argv) {
 	i_nodes.push_back(nnodes);
 	nnodes++;
       }
-    }
-    else if(vs[0] == ".o") {
+    } else if(vs[0] == ".o") {
       for(int i = 1; i < vs.size(); i++) {
 	node_name2id[vs[i]] = nnodes;
 	o_nodes.push_back(nnodes);
 	nnodes++;
       }
-    }
-    else if(vs[0] == ".pe") {
+    } else if(vs[0] == ".pe") {
       for(int i = 1; i < vs.size(); i++) {
 	node_name2id[vs[i]] = nnodes;
 	pe_nodes.push_back(nnodes);
 	nnodes++;
       }
-    }
-    else {
+    } else {
       if(cons.size() < nnodes) {
 	cons.resize(nnodes);
       }
@@ -490,8 +476,7 @@ int main(int argc, char** argv) {
 	inputs.push_back(p);
 	input_name2opnode[vs[i]] = p;
       }
-    }
-    else {
+    } else {
       int pos = 0;
       opnode * p = create_opnode(vs, pos, input_name2opnode);
       if(!p) {
@@ -549,7 +534,7 @@ int main(int argc, char** argv) {
 
   if(ncycle < 1) {
     cout << "your files are valid" << endl;
-    cout << "to run synthesis, please specify the number of cycles by using option -n";
+    cout << "to run synthesis, please specify the number of cycles by using option -n" << endl;
     return 0;
   }
   
@@ -560,7 +545,13 @@ int main(int argc, char** argv) {
   }
   
   // init condition
-  for(int i = 0; i < nnodes; i++) {
+  for(int j = 0; j < ninputs; j++) {
+    S.addClause(Glucose::mkLit(j, !fexmem));
+  }
+  for(int j = ninputs; j < ndata; j++) {
+    S.addClause(Glucose::mkLit(j, true));
+  }
+  for(int i = 1; i < nnodes; i++) {
     for(int j = 0; j < ndata; j++) {
       S.addClause(Glucose::mkLit(i*ndata + j, true));
     }
@@ -568,49 +559,93 @@ int main(int argc, char** argv) {
 
   // conditions for each cycle
   for(int i = 1; i < ncycle; i++) {
-    
-    // conditions for input nodes
-    for(int j : i_nodes) {
-      cardinality(S, i*nnodes*ndata + j*ndata, ninputs);
-      for(int k = ninputs; k < ndata; k++) {
-	S.addClause(Glucose::mkLit(i*nnodes*ndata + j*ndata + k, true));
+
+    // use external memory to store temporary data or not
+    if(fexmem) {
+      // conditions for input nodes
+      for(int j : i_nodes) {
+	cardinality(S, i*nnodes*ndata + j*ndata, ndata);
+	for(int k = 0; k < ndata; k++) {
+	  Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
+	  Glucose::Lit lf = Glucose::mkLit((i-1)*nnodes*ndata + k);
+	  S.addClause(~l, lf);
+	}
       }
-    }
     
-    // conditions for output nodes
-    for(int j : o_nodes) {
-      cardinality_set(S, i*nnodes*ndata + j*ndata, output_ids);
-      for(int k : output_ids) {
-	Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
+      // conditions for output nodes
+      for(int j : o_nodes) {
+	cardinality(S, i*nnodes*ndata + j*ndata, ndata);
+	for(int k = 0; k < ndata; k++) {
+	  Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
+	  Glucose::vec<Glucose::Lit> ls;
+	  ls.push(~l);
+	  for(int f : cons[j]) {
+	    Glucose::Lit lf = Glucose::mkLit((i-1)*nnodes*ndata + f*ndata + k);
+	    ls.push(lf);
+	  }
+	  S.addClause(ls);
+	}
+      }
+    
+      // conditions for external memory
+      for(int k = 0; k < ndata; k++) {
+	Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + k);
 	Glucose::vec<Glucose::Lit> ls;
 	ls.push(~l);
-	for(int f : cons[j]) {
-	  Glucose::Lit lf = Glucose::mkLit((i-1)*nnodes*ndata + f*ndata + k);
-	  ls.push(lf);
+	Glucose::Lit lp = Glucose::mkLit((i-1)*nnodes*ndata + k);
+	S.addClause(~lp, l);
+	ls.push(lp);
+	for(int j : o_nodes) {
+	  Glucose::Lit lo = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
+	  S.addClause(~lo, l);
+	  ls.push(lo);
 	}
 	S.addClause(ls);
       }
-      for(int k = 0; k < ndata; k++) {
-	if(find(output_ids.begin(), output_ids.end(), k) == output_ids.end()) {	
+    } else {
+      // conditions for input nodes
+      for(int j : i_nodes) {
+	cardinality(S, i*nnodes*ndata + j*ndata, ninputs);
+	for(int k = ninputs; k < ndata; k++) {
 	  S.addClause(Glucose::mkLit(i*nnodes*ndata + j*ndata + k, true));
 	}
       }
-    }
     
-    // conditions for external memory
-    for(int k = 0; k < ndata; k++) {
-      Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + k);
-      Glucose::vec<Glucose::Lit> ls;
-      ls.push(~l);
-      Glucose::Lit lp = Glucose::mkLit((i-1)*nnodes*ndata + k);
-      S.addClause(~lp, l);
-      ls.push(lp);
+      // conditions for output nodes
       for(int j : o_nodes) {
-	Glucose::Lit lo = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
-	S.addClause(~lo, l);
-	ls.push(lo);
+	cardinality_set(S, i*nnodes*ndata + j*ndata, output_ids);
+	for(int k : output_ids) {
+	  Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
+	  Glucose::vec<Glucose::Lit> ls;
+	  ls.push(~l);
+	  for(int f : cons[j]) {
+	    Glucose::Lit lf = Glucose::mkLit((i-1)*nnodes*ndata + f*ndata + k);
+	    ls.push(lf);
+	  }
+	  S.addClause(ls);
+	}
+	for(int k = 0; k < ndata; k++) {
+	  if(find(output_ids.begin(), output_ids.end(), k) == output_ids.end()) {	
+	    S.addClause(Glucose::mkLit(i*nnodes*ndata + j*ndata + k, true));
+	  }
+	}
       }
-      S.addClause(ls);
+    
+      // conditions for external memory
+      for(int k = 0; k < ndata; k++) {
+	Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + k);
+	Glucose::vec<Glucose::Lit> ls;
+	ls.push(~l);
+	Glucose::Lit lp = Glucose::mkLit((i-1)*nnodes*ndata + k);
+	S.addClause(~lp, l);
+	ls.push(lp);
+	for(int j : o_nodes) {
+	  Glucose::Lit lo = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
+	  S.addClause(~lo, l);
+	  ls.push(lo);
+	}
+	S.addClause(ls);
+      }
     }
     
     // conditions for PE nodes
@@ -686,14 +721,12 @@ int main(int argc, char** argv) {
     for(int i = 0; i < S.nVars(); i++) {
       if(S.model[i] == l_True) {
 	sat_file << i + 1 << " ";
-      }
-      else {
+      } else {
 	sat_file << "-" << i + 1 << " ";
       }
     }
     */
-  }
-  else {
+  } else {
     std::cout << "UNSAT" << std::endl;
     return 0;
   }
@@ -788,8 +821,7 @@ int main(int argc, char** argv) {
       df << "," << endl;
       if(image[i][id].empty()) {
 	df << "label=\"\"";
-      }
-      else {
+      } else {
 	df << "label=\"";
 	int j = 0;
 	int k = 0;
