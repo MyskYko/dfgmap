@@ -1,0 +1,35 @@
+.i it0 it1 it2 it3 il0 il1 il2 il3 ir0 ir1 ir2 ir3 ib0 ib1 ib2 ib3
+.o ot0 ot1 ot2 ot3 ol0 ol1 ol2 ol3 or0 or1 or2 or3 ob0 ob1 ob2 ob3
+.pe n0_0 n0_1 n0_2 n0_3 n1_0 n1_1 n1_2 n1_3 n2_0 n2_1 n2_2 n2_3 n3_0 n3_1 n3_2 n3_3
+ot0 n0_0
+ot1 n0_1
+ot2 n0_2
+ot3 n0_3
+ol0 n0_0
+ol1 n1_0
+ol2 n2_0
+ol3 n3_0
+or0 n0_3
+or1 n1_3
+or2 n2_3
+or3 n3_3
+ob0 n3_0
+ob1 n3_1
+ob2 n3_2
+ob3 n3_3
+n0_0 it0 il0 n0_1 n1_0
+n0_1 it1 n0_0 n0_2 n1_1
+n0_2 it2 n0_1 n0_3 n1_2
+n0_3 it3 ir0 n0_2 n1_3
+n1_0 il1 n0_0 n1_1 n2_0
+n1_1 n0_1 n1_0 n1_2 n2_1
+n1_2 n0_2 n1_1 n1_3 n2_2
+n1_3 ir1 n0_3 n1_2 n2_3
+n2_0 il2 n1_0 n2_1 n3_0
+n2_1 n1_1 n2_0 n2_2 n3_1
+n2_2 n1_2 n2_1 n2_3 n3_2
+n2_3 ir2 n1_3 n2_2 n3_3
+n3_0 il3 ib0 n2_0 n3_1
+n3_1 ib1 n2_1 n3_0 n3_2
+n3_2 ib2 n2_2 n3_1 n3_3
+n3_3 ir3 ib3 n2_3 n3_2
