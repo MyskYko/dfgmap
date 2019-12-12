@@ -1,3 +1,5 @@
 gen
 test
 *.o
+*.dot
+*.png

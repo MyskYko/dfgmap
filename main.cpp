@@ -19,7 +19,7 @@ using namespace std;
 int main(int argc, char** argv) {
   string efilename = "e.txt";
   string ffilename = "f.txt";
-  int ncycle = 0;
+  int ncycles = 0;
   string pfilename;
   string cfilename;
   int fcompress = 0;
@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
       switch(argv[i][1]) {
       case 'n':
 	try {
-	  ncycle = stoi(argv[++i]);
+	  ncycles = stoi(argv[++i]);
 	} catch(...) {
 	  show_error("-n must be followed by integer");
 	}
@@ -85,7 +85,7 @@ int main(int argc, char** argv) {
       case 'h':
 	cout << "usage : gen <options>" << endl;
 	cout << "\t-h       : show this usage" << endl;
-	cout << "\t-n <int> : the number of cycles [default = " << ncycle << "]" << endl;
+	cout << "\t-n <int> : the number of cycles [default = " << ncycles << "]" << endl;
 	cout << "\t-e <str> : the name of environment file [default = \"" << efilename << "\"]" << endl;
 	cout << "\t-f <str> : the name of formula file [default = \"" << ffilename << "\"]" << endl;
 	cout << "\t-p <str> : the name of placement file to generate pngs [default = \"" << pfilename << "\"]" << endl;
@@ -272,6 +272,7 @@ int main(int argc, char** argv) {
     gen_operands(p, ndata, operands, unique, datanames, fmac);
     output_ids.insert(p->id);
   }
+  assert(ndata == operands.size());
 
   if(nverbose >= 2) {
     cout << "### operand list ###" << endl;
@@ -288,31 +289,33 @@ int main(int argc, char** argv) {
     }
   }
 
-  if(ncycle < 1) {
+  if(ncycles < 1) {
     cout << "your files are valid" << endl;
     cout << "to run synthesis, please specify the number of cycles by using option -n" << endl;
     return 0;
   }
-  
+
   // instanciate SAT solver
-  Glucose::SimpSolver S;
+  Sat sat = Sat(i_nodes, o_nodes, pe_nodes, cons, ninputs, output_ids, operands);
 
-  // generate CNF
-  gen_cnf(S, ncycle, nnodes, ndata, ninputs, i_nodes, o_nodes, pe_nodes, cons, operands, output_ids, fexmem);
-
-  // write out cnf file
+  // generate cnf
+  sat.gen_cnf(ncycles);
+  // todo : fexmem
+  // todo : freg
+  
+  // write cnf file
   if(!cfilename.empty()) {
-    S.toDimacs(cfilename.c_str());
+    sat.write(cfilename);
     return 0;
   }
   
   // run sat solver
   clock_t start = clock();
-  bool r = S.solve();
+  bool r = sat.solve();
   clock_t end = clock();
+  
+  // show results
   std::cout << "SAT solver took " << (double)(end - start) / CLOCKS_PER_SEC << "s" << std::endl;
-
-  // check results
   if(r) {
     std::cout << "SAT" << std::endl;
   } else {
@@ -320,16 +323,16 @@ int main(int argc, char** argv) {
     return 0;
   }
 
+  sat.gen_image();
+  
   if(nverbose) {
     cout << "### results ###" << endl;
-    for(int i = 0; i < ncycle; i++) {
+    for(int i = 0; i < sat.image.size(); i++) {
       cout << "cycle " << i << " :" << endl;
-      for(int j = 0; j < nnodes; j++) {
+      for(int j = 0; j < sat.image[0].size(); j++) {
 	cout << "\tnode " << j << " :";
-	for(int k = 0; k < ndata; k++) {
-	  if(S.model[i*nnodes*ndata + j*ndata + k] == l_True) {
-	    cout << " " << k << "(" << datanames[k] << ")";
-	  }
+	for(int k : sat.image[i][j]) {
+	  cout << " " << k << "(" << datanames[k] << ")";
 	}
 	cout << endl;
       }
@@ -339,18 +342,6 @@ int main(int argc, char** argv) {
   // prepare for image generation
   if(pfilename.empty()) {
     return 0;
-  }
-
-  // create data distribution among nodes for each cycle
-  vector<vector<vector<int> > > image(ncycle, vector<vector<int> >(nnodes));
-  for(int i = 0; i < ncycle; i++) {
-    for(int j = 0; j < nnodes; j++) {
-      for(int k = 0; k < ndata; k++) {
-	if(S.model[i*nnodes*ndata + j*ndata + k] == l_True) {
-	  image[i][j].push_back(k);
-	}
-      }
-    }
   }
 
   // read placement file
@@ -371,7 +362,7 @@ int main(int argc, char** argv) {
   pfile.close();
 
   // generate image
-  for(int i = 0; i < ncycle; i++) {
+  for(int i = 0; i < ncycles; i++) {
     // generate dot file
     ofstream df("out.dot");
     df << "graph G {" << endl;
@@ -407,13 +398,13 @@ int main(int argc, char** argv) {
       df << "," << endl;
       df << "height=" << h;
       df << "," << endl;
-      if(image[i][id].empty()) {
+      if(sat.image[i][id].empty()) {
 	df << "label=\"\"";
       } else {
 	df << "label=\"";
 	int j = 0;
 	int k = 0;
-	for(char c : datanames[image[i][id][0]]) {
+	for(char c : datanames[sat.image[i][id][0]]) {
 	  if(j >= 14*w) {
 	    df << "\\l";
 	    j = 0;
