@@ -25,15 +25,39 @@ void show_error(string s) {
   cout << "see usage by using option -h" << endl;
 }
 
+int optype(string s) {
+  switch(s[0]) {
+  case '+':
+    return 1;
+  case '*':
+    return 2;
+  default:
+    break;
+  }
+  return 0;
+}
+
+string typeop(int i) {
+  switch(i) {
+  case 1:
+    return "+";
+  case 2:
+    return "*";
+  default:
+    break;
+  }
+  return "";
+}
+
 typedef struct opnode_ {
   int type; // input 0, + 1, * 2
   vector<struct opnode_ *> vc;
   int id;
 } opnode;
 
-opnode * create_opnode(vector<string> &vs, int &pos, map<string, opnode *> &input_name2opnode) {
-  if(vs[pos] != "+" && vs[pos] != "*") {
-    opnode * p = input_name2opnode[vs[pos]];
+opnode * create_opnode(vector<string> &vs, int &pos, map<string, opnode *> &data_name2opnode) {
+  if(!optype(vs[pos])) {
+    opnode * p = data_name2opnode[vs[pos]];
     if(!p) {
       show_error("data " + vs[pos] + " unspecified");
       return NULL;
@@ -42,19 +66,13 @@ opnode * create_opnode(vector<string> &vs, int &pos, map<string, opnode *> &inpu
   }
   opnode * p = new opnode;
   p->id = -1;
-  if(vs[pos] == "+") {
-    p->type = 1;
-  } else if(vs[pos] == "*") {
-    p->type = 2;
-  } else {
-    assert(0);
-  }
-  opnode * l = create_opnode(vs, ++pos, input_name2opnode);
+  p->type = optype(vs[pos]);
+  opnode * l = create_opnode(vs, ++pos, data_name2opnode);
   if(!l) {
     return NULL;
   }
   p->vc.push_back(l);
-  opnode * r = create_opnode(vs, ++pos, input_name2opnode);
+  opnode * r = create_opnode(vs, ++pos, data_name2opnode);
   if(!r) {
     return NULL;
   }
@@ -66,12 +84,10 @@ void print_opnode(opnode * p, int depth) {
   for(int i = 0; i < depth; i++) {
     cout << "\t";
   }
-  if(p->type == 0) {
+  if(!p->type) {
     cout << p->id << endl;
-  } else if(p->type == 1) {
-    cout << "+" << endl;
-  } else if(p->type == 2) {
-    cout << "*" << endl;
+  } else {
+    cout << typeop(p->type) << endl;
   }
   for(auto c : p->vc) {
     print_opnode(c, depth + 1);
@@ -79,7 +95,7 @@ void print_opnode(opnode * p, int depth) {
 }
 
 void compress_opnode(opnode * p) {
-  if(p->type == 0) {
+  if(!p->type) {
     return;
   }
   vector<opnode *> vcn;
@@ -89,7 +105,6 @@ void compress_opnode(opnode * p) {
       for(auto cc : c->vc) {
 	p->vc.push_back(cc);
       }
-      delete c;
     } else {
       vcn.push_back(c);
     }
@@ -123,7 +138,6 @@ void gen_operands(opnode * p, int &ndata, vector<set<set<int> > > &operands, map
   multiset<int> cids;
   for(auto c : p->vc) {
     gen_operands(c, ndata, operands, unique, datanames, fmac);
-    assert(c->id != -1);
     cids.insert(c->id);
   }
   pair<int, multiset<int> > key = make_pair(p->type, cids);
@@ -176,8 +190,9 @@ void gen_operands(opnode * p, int &ndata, vector<set<set<int> > > &operands, map
 				       ss.insert(s);
 				       // MAC
 				       if(fmac) {
-					 if(a.size() == 1 && p->type == 1 && a[0]->type == 2) {
+					 if(a.size() == 1 && p->type == optype("+") && a[0]->type == optype("*")) {
 					   for(auto cs : operands[a[0]->id]) {
+					     assert(cs.size() == 2);
 					     s.clear();
 					     for(auto cc : cs) {
 					       s.insert(cc);
@@ -190,8 +205,9 @@ void gen_operands(opnode * p, int &ndata, vector<set<set<int> > > &operands, map
 					     ss.insert(s);
 					   }
 					 }
-					 if(b.size() == 1 && p->type == 1 && b[0]->type == 2) {
+					 if(b.size() == 1 && p->type == optype("+") && b[0]->type == optype("*")) {
 					   for(auto cs : operands[b[0]->id]) {
+					     assert(cs.size() == 2);
 					     s.clear();
 					     for(auto cc : cs) {
 					       s.insert(cc);
@@ -210,11 +226,9 @@ void gen_operands(opnode * p, int &ndata, vector<set<set<int> > > &operands, map
 				     string dataname;
 				     for(auto id : sub) {
 				       dataname += datanames[id];
-				       if(p->type == 1) {
-					 dataname += " + ";
-				       } else if(p->type == 2) {
-					 dataname += " * ";
-				       }
+				       dataname += " ";
+				       dataname += typeop(p->type);
+				       dataname += " ";
 				     }
 				     dataname.pop_back();
 				     dataname.pop_back();
@@ -474,9 +488,9 @@ int main(int argc, char** argv) {
     return 1;
   }
   int ninputs = 0;
-  map<string, opnode *> input_name2opnode;
+  map<string, opnode *> data_name2opnode;
   vector<string> datanames;
-  vector<opnode *> inputs(1, NULL);
+  vector<string> outputnames;
   vector<opnode *> outputs;
   while(getline(ffile, str)) {
     string s;
@@ -494,19 +508,31 @@ int main(int argc, char** argv) {
 	opnode * p = new opnode;
 	p->type = 0;
 	p->id = ninputs++;
-	inputs.push_back(p);
-	input_name2opnode[vs[i]] = p;
+	data_name2opnode[vs[i]] = p;
+      }
+    } else if(vs[0] == ".o") {
+      for(int i = 1; i < vs.size(); i++) {
+	outputnames.push_back(vs[i]);
       }
     } else {
-      int pos = 0;
-      opnode * p = create_opnode(vs, pos, input_name2opnode);
+      int pos = 1;
+      opnode * p = create_opnode(vs, pos, data_name2opnode);
       if(!p) {
 	return 1;
       }
-      outputs.push_back(p);
+      data_name2opnode[vs[0]] = p;
     }
   }
   ffile.close();
+  
+  for(auto s : outputnames) {
+    opnode * p = data_name2opnode[s];
+    if(!p) {
+      show_error("output data " + s + " function unspecified");
+      return 1;
+    }
+    outputs.push_back(p);
+  }
 
   if(nverbose >= 2) {
     cout << "### formula information ###" << endl;
@@ -519,6 +545,7 @@ int main(int argc, char** argv) {
   if(fcompress) {
     for(auto p : outputs) {
       compress_opnode(p);
+      // memory leak
     }
     if(nverbose >= 2) {
       cout << "### formula after compression ###" << endl;
