@@ -1,14 +1,11 @@
-//g++  -I ~/glucose-syrup gen.cpp ~/glucose-syrup/simp/lib.a -o gen
-#include <iostream>
 #include <fstream>
 #include <sstream>
-#include <vector>
-#include <map>
-#include <algorithm>
 #include <iomanip>
-#include <set>
 #include <time.h>
-#include <functional>
+
+#include "global.hpp"
+#include "op.hpp"
+#include "sat.hpp"
 
 #include "utils/System.h"
 #include "utils/ParseUtils.h"
@@ -16,282 +13,8 @@
 #include "core/Dimacs.h"
 #include "simp/SimpSolver.h"
 
-#include <cassert>
-
 using namespace std;
 
-void show_error(string s) {
-  cout << "error : " << s << endl;
-  cout << "see usage by using option -h" << endl;
-}
-
-int optype(string s) {
-  switch(s[0]) {
-  case '+':
-    return 1;
-  case '*':
-    return 2;
-  default:
-    break;
-  }
-  return 0;
-}
-
-string typeop(int i) {
-  switch(i) {
-  case 1:
-    return "+";
-  case 2:
-    return "*";
-  default:
-    break;
-  }
-  return "";
-}
-
-typedef struct opnode_ {
-  int type; // input 0, + 1, * 2
-  vector<struct opnode_ *> vc;
-  int id;
-} opnode;
-
-opnode * create_opnode(vector<string> &vs, int &pos, map<string, opnode *> &data_name2opnode) {
-  if(!optype(vs[pos])) {
-    opnode * p = data_name2opnode[vs[pos]];
-    if(!p) {
-      show_error("data " + vs[pos] + " unspecified");
-      return NULL;
-    }
-    return p;
-  }
-  opnode * p = new opnode;
-  p->id = -1;
-  p->type = optype(vs[pos]);
-  opnode * l = create_opnode(vs, ++pos, data_name2opnode);
-  if(!l) {
-    return NULL;
-  }
-  p->vc.push_back(l);
-  opnode * r = create_opnode(vs, ++pos, data_name2opnode);
-  if(!r) {
-    return NULL;
-  }
-  p->vc.push_back(r);
-  return p;
-}
-
-void print_opnode(opnode * p, int depth) {
-  for(int i = 0; i < depth; i++) {
-    cout << "\t";
-  }
-  if(!p->type) {
-    cout << p->id << endl;
-  } else {
-    cout << typeop(p->type) << endl;
-  }
-  for(auto c : p->vc) {
-    print_opnode(c, depth + 1);
-  }
-}
-
-void compress_opnode(opnode * p) {
-  if(!p->type) {
-    return;
-  }
-  vector<opnode *> vcn;
-  for(int i = 0; i < p->vc.size(); i++) {
-    auto c = p->vc[i];
-    if(p->type == c->type) {
-      for(auto cc : c->vc) {
-	p->vc.push_back(cc);
-      }
-    } else {
-      vcn.push_back(c);
-    }
-  }
-  p->vc = vcn;
-  for(auto c : p->vc) {
-    compress_opnode(c);
-  }
-}
-
-void recursive_comb(int *indexes, int s, int rest, std::function<void(int *)> f) {
-  if (rest == 0) {
-    f(indexes);
-  } else {
-    if (s < 0) return;
-    recursive_comb(indexes, s - 1, rest, f);
-    indexes[rest - 1] = s;
-    recursive_comb(indexes, s - 1, rest - 1, f);
-  }
-}
-
-void foreach_comb(int n, int k, std::function<void(int *)> f) {
-  int indexes[k];
-  recursive_comb(indexes, n - 1, k, f);
-}
-
-void gen_operands(opnode * p, int &ndata, vector<set<set<int> > > &operands, map<pair<int, multiset<int> >, int> &unique, vector<string> &datanames, int fmac) {
-  if(p->id != -1) {
-    return;
-  }
-  multiset<int> cids;
-  for(auto c : p->vc) {
-    gen_operands(c, ndata, operands, unique, datanames, fmac);
-    cids.insert(c->id);
-  }
-  pair<int, multiset<int> > key = make_pair(p->type, cids);
-  if(unique[key]) {
-    p->id = unique[key];
-    return;
-  }
-  for(int i = 2; i <= cids.size(); i++) {
-    foreach_comb(cids.size(), i, [&](int *indexes) {
-				   multiset<int> sub;
-				   for(int k = 0; k < i; k++) {
-				     sub.insert(p->vc[indexes[k]]->id);
-				   }
-				   pair<int, multiset<int> > keysub = make_pair(p->type, sub);
-				   if(!unique[keysub]) {
-				     set<set<int> > ss;
-				     for(int j = 1; j < 1 << (i-1); j++) {
-				       set<int> s;
-				       int j_ = j;
-				       vector<opnode *> a;
-				       vector<opnode *> b;
-				       for(int k = 0; k < i; k++) {
-					 if(j_ % 2) {
-					   a.push_back(p->vc[indexes[k]]);
-					 } else {
-					   b.push_back(p->vc[indexes[k]]);
-					 }
-					 j_ = j_ >> 1;
-				       }
-				       multiset<int> as;
-				       for(auto q : a) {
-					 as.insert(q->id);
-				       }
-				       pair<int, multiset<int> > keya = make_pair(p->type, as);
-				       multiset<int> bs;
-				       for(auto q : b) {
-					 bs.insert(q->id);
-				       }
-				       pair<int, multiset<int> > keyb = make_pair(p->type, bs);
-				       if(a.size() == 1) {
-					 s.insert(a[0]->id);
-				       } else {
-					 s.insert(unique[keya]);
-				       }
-				       if(b.size() == 1) {
-					 s.insert(b[0]->id);
-				       } else {
-					 s.insert(unique[keyb]);
-				       }
-				       ss.insert(s);
-				       // MAC
-				       if(fmac) {
-					 if(a.size() == 1 && p->type == optype("+") && a[0]->type == optype("*")) {
-					   for(auto cs : operands[a[0]->id]) {
-					     assert(cs.size() == 2);
-					     s.clear();
-					     for(auto cc : cs) {
-					       s.insert(cc);
-					     }
-					     if(b.size() == 1) {
-					       s.insert(b[0]->id);
-					     } else {
-					       s.insert(unique[keyb]);
-					     }
-					     ss.insert(s);
-					   }
-					 }
-					 if(b.size() == 1 && p->type == optype("+") && b[0]->type == optype("*")) {
-					   for(auto cs : operands[b[0]->id]) {
-					     assert(cs.size() == 2);
-					     s.clear();
-					     for(auto cc : cs) {
-					       s.insert(cc);
-					     }
-					     if(a.size() == 1) {
-					       s.insert(a[0]->id);
-					     } else {
-					       s.insert(unique[keya]);
-					     }
-					     ss.insert(s);
-					   }
-					 }
-				       }
-				     }
-				     operands.push_back(ss);
-				     string dataname;
-				     for(auto id : sub) {
-				       dataname += datanames[id];
-				       dataname += " ";
-				       dataname += typeop(p->type);
-				       dataname += " ";
-				     }
-				     dataname.pop_back();
-				     dataname.pop_back();
-				     dataname.pop_back();
-				     datanames.push_back(dataname);
-				     unique[keysub] = ndata++;
-				   }
-				 });
-  }
-  p->id = unique[key];
-}
-
-int cardinality(Glucose::SimpSolver &S, int i, int n) {
-  vector<int> vVars;
-  for(int j = i; j < i+n; j++) {
-    vVars.push_back(j);
-  }
-  while(vVars.size() > 1) {
-    int k = 0;
-    for(int j = 0; j < vVars.size()/2; j++) {
-      S.newVar();
-      Glucose::Lit l = Glucose::mkLit(S.nVars()-1);
-      Glucose::Lit l0 = Glucose::mkLit(vVars[2*j]);
-      Glucose::Lit l1 = Glucose::mkLit(vVars[2*j+1]);
-      S.addClause(~l0, ~l1);
-      S.addClause(~l, l0, l1);
-      S.addClause(~l0, l);
-      S.addClause(~l1, l);
-      vVars[k++] = S.nVars()-1;
-    }
-    if(vVars.size()%2) {
-      vVars[k++] = vVars.back();
-    }
-    vVars.resize(k);
-  }
-  return 0;
-}
-
-int cardinality_set(Glucose::SimpSolver &S, int i, set<int> s) {
-  vector<int> vVars;
-  for(int j : s) {
-    vVars.push_back(i+j);
-  }
-  while(vVars.size() > 1) {
-    int k = 0;
-    for(int j = 0; j < vVars.size()/2; j++) {
-      S.newVar();
-      Glucose::Lit l = Glucose::mkLit(S.nVars()-1);
-      Glucose::Lit l0 = Glucose::mkLit(vVars[2*j]);
-      Glucose::Lit l1 = Glucose::mkLit(vVars[2*j+1]);
-      S.addClause(~l0, ~l1);
-      S.addClause(~l, l0, l1);
-      S.addClause(~l0, l);
-      S.addClause(~l1, l);
-      vVars[k++] = S.nVars()-1;
-    }
-    if(vVars.size()%2) {
-      vVars[k++] = vVars.back();
-    }
-    vVars.resize(k);
-  }
-  return 0;
-}
 
 int main(int argc, char** argv) {
   string efilename = "e.txt";
@@ -313,34 +36,29 @@ int main(int argc, char** argv) {
 	  ncycle = stoi(argv[++i]);
 	} catch(...) {
 	  show_error("-n must be followed by integer");
-	  return 1;
 	}
 	break;
       case 'e':
 	if(i+1 >= argc) {
 	  show_error("-e must be followed by file name");
-	  return 1;
 	}
 	efilename = argv[++i];
 	break;
       case 'f':
 	if(i+1 >= argc) {
 	  show_error("-f must be followed by file name");
-	  return 1;
 	}
 	ffilename = argv[++i];
 	break;
       case 'p':
 	if(i+1 >= argc) {
 	  show_error("-p must be followed by file name");
-	  return 1;
 	}
 	pfilename = argv[++i];
 	break;
       case 'w':
 	if(i+1 >= argc) {
 	  show_error("-w must be followed by file name");
-	  return 1;
 	}
 	cfilename = argv[++i];
 	break;
@@ -362,7 +80,6 @@ int main(int argc, char** argv) {
 	  nverbose = stoi(argv[++i]);
 	} catch(...) {
 	  show_error("-v should be followed by integer");
-	  return 1;
 	}
 	break;
       case 'h':
@@ -383,7 +100,6 @@ int main(int argc, char** argv) {
 	return 0;
       default:
 	show_error("invalid option " + string(argv[i]));
-	return 1;
       }
     }
   }
@@ -392,7 +108,6 @@ int main(int argc, char** argv) {
   ifstream efile(efilename);
   if(!efile) {
     show_error("cannot open environment file");
-    return 1;
   }
   map<string, int> node_name2id;
   int nnodes = 1; // external memory
@@ -436,13 +151,11 @@ int main(int argc, char** argv) {
       int id0 = node_name2id[vs[0]];
       if(!id0) {
 	show_error("node " + vs[0] + " unspecified");
-	return 1;
       }
       for(int i = 1; i < vs.size(); i++) {
 	int idi = node_name2id[vs[i]];
 	if(!idi) {
 	  show_error("node " + vs[i] + " unspecified");
-	  return 1;
 	}
 	cons[id0].insert(idi);
       }
@@ -485,7 +198,6 @@ int main(int argc, char** argv) {
   ifstream ffile(ffilename);
   if(!ffile) {
     show_error("cannot open formula file");
-    return 1;
   }
   int ninputs = 0;
   map<string, opnode *> data_name2opnode;
@@ -517,9 +229,6 @@ int main(int argc, char** argv) {
     } else {
       int pos = 1;
       opnode * p = create_opnode(vs, pos, data_name2opnode);
-      if(!p) {
-	return 1;
-      }
       data_name2opnode[vs[0]] = p;
     }
   }
@@ -529,7 +238,6 @@ int main(int argc, char** argv) {
     opnode * p = data_name2opnode[s];
     if(!p) {
       show_error("output data " + s + " function unspecified");
-      return 1;
     }
     outputs.push_back(p);
   }
@@ -545,7 +253,7 @@ int main(int argc, char** argv) {
   if(fcompress) {
     for(auto p : outputs) {
       compress_opnode(p);
-      // memory leak
+      // notice : memory leaks here
     }
     if(nverbose >= 2) {
       cout << "### formula after compression ###" << endl;
@@ -588,171 +296,9 @@ int main(int argc, char** argv) {
   
   // instanciate SAT solver
   Glucose::SimpSolver S;
-  while(ncycle * nnodes * ndata > S.nVars()) {
-    S.newVar();
-  }
-  
-  // init condition
-  for(int j = 0; j < ninputs; j++) {
-    S.addClause(Glucose::mkLit(j, !fexmem));
-  }
-  for(int j = ninputs; j < ndata; j++) {
-    S.addClause(Glucose::mkLit(j, true));
-  }
-  for(int i = 1; i < nnodes; i++) {
-    for(int j = 0; j < ndata; j++) {
-      S.addClause(Glucose::mkLit(i*ndata + j, true));
-    }
-  }
 
-  // conditions for each cycle
-  for(int i = 1; i < ncycle; i++) {
-
-    // use external memory to store temporary data or not
-    if(fexmem) {
-      // conditions for input nodes
-      for(int j : i_nodes) {
-	cardinality(S, i*nnodes*ndata + j*ndata, ndata);
-	for(int k = 0; k < ndata; k++) {
-	  Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
-	  Glucose::Lit lf = Glucose::mkLit((i-1)*nnodes*ndata + k);
-	  S.addClause(~l, lf);
-	}
-      }
-    
-      // conditions for output nodes
-      for(int j : o_nodes) {
-	cardinality(S, i*nnodes*ndata + j*ndata, ndata);
-	for(int k = 0; k < ndata; k++) {
-	  Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
-	  Glucose::vec<Glucose::Lit> ls;
-	  ls.push(~l);
-	  for(int f : cons[j]) {
-	    Glucose::Lit lf = Glucose::mkLit((i-1)*nnodes*ndata + f*ndata + k);
-	    ls.push(lf);
-	  }
-	  S.addClause(ls);
-	}
-      }
-    
-      // conditions for external memory
-      for(int k = 0; k < ndata; k++) {
-	Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + k);
-	Glucose::vec<Glucose::Lit> ls;
-	ls.push(~l);
-	Glucose::Lit lp = Glucose::mkLit((i-1)*nnodes*ndata + k);
-	S.addClause(~lp, l);
-	ls.push(lp);
-	for(int j : o_nodes) {
-	  Glucose::Lit lo = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
-	  S.addClause(~lo, l);
-	  ls.push(lo);
-	}
-	S.addClause(ls);
-      }
-    } else {
-      // conditions for input nodes
-      for(int j : i_nodes) {
-	cardinality(S, i*nnodes*ndata + j*ndata, ninputs);
-	for(int k = ninputs; k < ndata; k++) {
-	  S.addClause(Glucose::mkLit(i*nnodes*ndata + j*ndata + k, true));
-	}
-      }
-    
-      // conditions for output nodes
-      for(int j : o_nodes) {
-	cardinality_set(S, i*nnodes*ndata + j*ndata, output_ids);
-	for(int k : output_ids) {
-	  Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
-	  Glucose::vec<Glucose::Lit> ls;
-	  ls.push(~l);
-	  for(int f : cons[j]) {
-	    Glucose::Lit lf = Glucose::mkLit((i-1)*nnodes*ndata + f*ndata + k);
-	    ls.push(lf);
-	  }
-	  S.addClause(ls);
-	}
-	for(int k = 0; k < ndata; k++) {
-	  if(find(output_ids.begin(), output_ids.end(), k) == output_ids.end()) {	
-	    S.addClause(Glucose::mkLit(i*nnodes*ndata + j*ndata + k, true));
-	  }
-	}
-      }
-    
-      // conditions for external memory
-      for(int k = 0; k < ndata; k++) {
-	Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + k);
-	Glucose::vec<Glucose::Lit> ls;
-	ls.push(~l);
-	Glucose::Lit lp = Glucose::mkLit((i-1)*nnodes*ndata + k);
-	S.addClause(~lp, l);
-	ls.push(lp);
-	for(int j : o_nodes) {
-	  Glucose::Lit lo = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
-	  S.addClause(~lo, l);
-	  ls.push(lo);
-	}
-	S.addClause(ls);
-      }
-    }
-    
-    // conditions for PE nodes
-    for(int j : pe_nodes) {
-      cardinality(S, i*nnodes*ndata + j*ndata, ndata);
-      
-      // create OR of existence of data among adjacent nodes and itself
-      vector<int> vVars;
-      for(int k = 0; k < ndata; k++) {
-	S.newVar();
-	Glucose::Lit l = Glucose::mkLit(S.nVars()-1);
-	Glucose::vec<Glucose::Lit> ls;
-	ls.push(~l);
-	Glucose::Lit lself = Glucose::mkLit((i-1)*nnodes*ndata + j*ndata + k);
-	ls.push(lself);
-	S.addClause(~lself, l);
-	for(int f : cons[j]) {
-	  Glucose::Lit lf = Glucose::mkLit((i-1)*nnodes*ndata + f*ndata + k);
-	  ls.push(lf);
-	  S.addClause(~lf, l);
-	}
-	S.addClause(ls);
-	vVars.push_back(S.nVars()-1);
-      }
-      
-      // conditions for communication and operation
-      for(int k = 0; k < ndata; k++) {
-	Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
-	Glucose::vec<Glucose::Lit> lt;
-	lt.push(~l);
-	
-	// operation possibility
-	for(auto s : operands[k]) {
-	  S.newVar();
-	  Glucose::Lit la = Glucose::mkLit(S.nVars()-1);
-	  Glucose::vec<Glucose::Lit> ls;
-	  ls.push(la);
-	  for(int o : s) {
-	    Glucose::Lit lo = Glucose::mkLit(vVars[o]);
-	    ls.push(~lo);
-	    S.addClause(~la, lo);
-	  }
-	  S.addClause(ls);
-	  lt.push(la);
-	}
-	
-	// communication possibility
-	Glucose::Lit lk = Glucose::mkLit(vVars[k]);
-	lt.push(lk);
-	S.addClause(lt);
-      }
-    }
-  }
-
-  // conditions for output ready
-  for(int k : output_ids) {
-    Glucose::Lit l = Glucose::mkLit((ncycle-1)*nnodes*ndata + k);
-    S.addClause(l);
-  }
+  // generate CNF
+  gen_cnf(S, ncycle, nnodes, ndata, ninputs, i_nodes, o_nodes, pe_nodes, cons, operands, output_ids, fexmem);
 
   // write out cnf file
   if(!cfilename.empty()) {
@@ -769,17 +315,6 @@ int main(int argc, char** argv) {
   // check results
   if(r) {
     std::cout << "SAT" << std::endl;
-    /*
-    ofstream sat_file("test");
-    sat_file << "SAT" << std::endl;
-    for(int i = 0; i < S.nVars(); i++) {
-      if(S.model[i] == l_True) {
-	sat_file << i + 1 << " ";
-      } else {
-	sat_file << "-" << i + 1 << " ";
-      }
-    }
-    */
   } else {
     std::cout << "UNSAT" << std::endl;
     return 0;
@@ -822,7 +357,6 @@ int main(int argc, char** argv) {
   ifstream pfile(pfilename);
   if(!pfile) {
     show_error("cannot open placement file");
-    return 1;
   }
   vector<vector<string> > pl;
   while(getline(pfile, str)) {
