@@ -558,3 +558,151 @@ void Sat::gen_cnf_reg(int ncycles, int nregs) {
     S.addClause(l);
   }
 }
+
+void Sat::gen_cnf_reg_exmem(int ncycles, int nregs) {
+  ncycles_ = ncycles;
+  freg = 1;
+  
+  int npes = pe_nodes.size();
+  int nnodes_ = nnodes + npes;
+  
+  assert(!S.nVars());
+  while(ncycles * nnodes_ * ndata > S.nVars()) {
+    S.newVar();
+  }
+  
+  // init condition
+  for(int j = 0; j < ninputs; j++) {
+    S.addClause(Glucose::mkLit(j));
+  }
+  for(int j = ninputs; j < ndata; j++) {
+    S.addClause(Glucose::mkLit(j, true));
+  }
+  for(int i = 1; i < nnodes_; i++) {
+    for(int j = 0; j < ndata; j++) {
+      S.addClause(Glucose::mkLit(i*ndata + j, true));
+    }
+  }
+
+  // conditions for each cycle
+  for(int i = 1; i < ncycles; i++) {
+
+    // conditions for input nodes
+    for(int j : i_nodes) {
+      cardinality(S, i*nnodes_*ndata + j*ndata, ndata);
+      for(int k = 0; k < ndata; k++) {
+	Glucose::Lit l = Glucose::mkLit(i*nnodes_*ndata + j*ndata + k);
+	Glucose::Lit lf = Glucose::mkLit((i-1)*nnodes_*ndata + k);
+	S.addClause(~l, lf);
+      }
+    }
+
+    // conditions for output nodes
+    for(int j : o_nodes) {
+      cardinality(S, i*nnodes_*ndata + j*ndata, ndata);
+      for(int k = 0; k < ndata; k++) {
+	Glucose::Lit l = Glucose::mkLit(i*nnodes_*ndata + j*ndata + k);
+	Glucose::vec<Glucose::Lit> ls;
+	ls.push(~l);
+	for(int f : cons[j]) {
+	  Glucose::Lit lf = Glucose::mkLit((i-1)*nnodes_*ndata + f*ndata + k);
+	  ls.push(lf);
+	  Glucose::Lit lfr = Glucose::mkLit((i-1)*nnodes_*ndata + (f+npes)*ndata + k);
+	  ls.push(lfr);
+	}
+	S.addClause(ls);
+      }
+    }
+    
+    // conditions for external memory
+    for(int k = 0; k < ndata; k++) {
+      Glucose::Lit l = Glucose::mkLit(i*nnodes_*ndata + k);
+      Glucose::vec<Glucose::Lit> ls;
+      ls.push(~l);
+      Glucose::Lit lp = Glucose::mkLit((i-1)*nnodes_*ndata + k);
+      S.addClause(~lp, l);
+      ls.push(lp);
+      for(int j : o_nodes) {
+	Glucose::Lit lo = Glucose::mkLit(i*nnodes_*ndata + j*ndata + k);
+	S.addClause(~lo, l);
+	ls.push(lo);
+      }
+      S.addClause(ls);
+    }
+    
+    // conditions for PE nodes
+    for(int j : pe_nodes) {
+      cardinality(S, i*nnodes_*ndata + j*ndata, ndata);
+      
+      // create OR of existence of data among adjacent nodes and itself
+      vector<int> vVars;
+      for(int k = 0; k < ndata; k++) {
+	S.newVar();
+	Glucose::Lit l = Glucose::mkLit(S.nVars()-1);
+	Glucose::vec<Glucose::Lit> ls;
+	ls.push(~l);
+	Glucose::Lit lself = Glucose::mkLit((i-1)*nnodes_*ndata + j*ndata + k);
+	ls.push(lself);
+	S.addClause(~lself, l);
+	Glucose::Lit lselfr = Glucose::mkLit((i-1)*nnodes_*ndata + (j+npes)*ndata + k);
+	ls.push(lselfr);
+	S.addClause(~lselfr, l);
+	for(int f : cons[j]) {
+	  Glucose::Lit lf = Glucose::mkLit((i-1)*nnodes_*ndata + f*ndata + k);
+	  ls.push(lf);
+	  S.addClause(~lf, l);
+	  if(find(pe_nodes.begin(), pe_nodes.end(), j) != pe_nodes.end()) {	  
+	    Glucose::Lit lfr = Glucose::mkLit((i-1)*nnodes_*ndata + (f+npes)*ndata + k);
+	    ls.push(lfr);
+	    S.addClause(~lfr, l);
+	  }
+	}
+	S.addClause(ls);
+	vVars.push_back(S.nVars()-1);
+      }
+      
+      // conditions for communication and operation
+      for(int k = 0; k < ndata; k++) {
+	Glucose::Lit l = Glucose::mkLit(i*nnodes_*ndata + j*ndata + k);
+	Glucose::vec<Glucose::Lit> lt;
+	lt.push(~l);
+	
+	// operation possibility
+	for(auto s : operands[k]) {
+	  S.newVar();
+	  Glucose::Lit la = Glucose::mkLit(S.nVars()-1);
+	  Glucose::vec<Glucose::Lit> ls;
+	  ls.push(la);
+	  for(int o : s) {
+	    Glucose::Lit lo = Glucose::mkLit(vVars[o]);
+	    ls.push(~lo);
+	    S.addClause(~la, lo);
+	  }
+	  S.addClause(ls);
+	  lt.push(la);
+	}
+	
+	// communication possibility
+	Glucose::Lit lk = Glucose::mkLit(vVars[k]);
+	lt.push(lk);
+	S.addClause(lt);
+      }
+
+      // registers
+      for(int k = 0; k < ndata; k++) {
+	if(nregs > 0) {
+	  cardinality_k(S, i*nnodes_*ndata + (j+npes)*ndata, ndata, nregs);
+	}
+	Glucose::Lit l = Glucose::mkLit(i*nnodes_*ndata + (j+npes)*ndata + k);
+	Glucose::Lit lk = Glucose::mkLit(vVars[k]);
+	S.addClause(~l, lk);
+      }
+    }
+  }
+
+  // conditions for output ready
+  for(int k : output_ids) {
+    Glucose::Lit l = Glucose::mkLit((ncycles-1)*nnodes_*ndata + k);
+    S.addClause(l);
+  }
+}

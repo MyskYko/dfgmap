@@ -73,6 +73,10 @@ int main(int argc, char** argv) {
 	fexmem = 1;
 	break;
       case 'r':
+	if(i+1 >= argc || argv[i+1][0] == '-') {
+	  nregs = -1;
+	  break;
+	}
 	try {
 	  nregs = stoi(argv[++i]);
 	} catch(...) {
@@ -309,12 +313,14 @@ int main(int argc, char** argv) {
   
   // generate cnf
   if(fexmem) {
-    sat.gen_cnf_exmem(ncycles);
-  }
-  else if(nregs) {
+    if(nregs) {
+      sat.gen_cnf_reg_exmem(ncycles, nregs);
+    } else {    
+      sat.gen_cnf_exmem(ncycles);
+    }
+  } else if(nregs) {
     sat.gen_cnf_reg(ncycles, nregs);
-  }
-  else {
+  } else {
     sat.gen_cnf(ncycles);
   }
   
