@@ -299,8 +299,12 @@ int main(int argc, char** argv) {
   Sat sat = Sat(i_nodes, o_nodes, pe_nodes, cons, ninputs, output_ids, operands);
 
   // generate cnf
-  sat.gen_cnf(ncycles);
-  // todo : fexmem
+  if(fexmem) {
+    sat.gen_cnf_exmem(ncycles);
+  }
+  else {
+    sat.gen_cnf(ncycles);
+  }
   // todo : freg
   
   // write cnf file

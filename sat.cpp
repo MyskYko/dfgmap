@@ -197,14 +197,17 @@ void Sat::gen_image() {
   }
 }
 
-void gen_cnf(Glucose::SimpSolver &S, int ncycle, int nnodes, int ndata, int ninputs, vector<int> &i_nodes, vector<int> &o_nodes, vector<int> &pe_nodes, vector<set<int> > &cons, vector<set<set<int> > > &operands, set<int> &output_ids, int fexmem) {
-  while(ncycle * nnodes * ndata > S.nVars()) {
+void Sat::gen_cnf_exmem(int ncycles) {
+  ncycles_ = ncycles;
+  
+  assert(!S.nVars());
+  while(ncycles * nnodes * ndata > S.nVars()) {
     S.newVar();
   }
   
   // init condition
   for(int j = 0; j < ninputs; j++) {
-    S.addClause(Glucose::mkLit(j, !fexmem));
+    S.addClause(Glucose::mkLit(j));
   }
   for(int j = ninputs; j < ndata; j++) {
     S.addClause(Glucose::mkLit(j, true));
@@ -216,94 +219,47 @@ void gen_cnf(Glucose::SimpSolver &S, int ncycle, int nnodes, int ndata, int ninp
   }
 
   // conditions for each cycle
-  for(int i = 1; i < ncycle; i++) {
+  for(int i = 1; i < ncycles; i++) {
 
-    // use external memory to store temporary data or not
-    if(fexmem) {
-      // conditions for input nodes
-      for(int j : i_nodes) {
-	cardinality(S, i*nnodes*ndata + j*ndata, ndata);
-	for(int k = 0; k < ndata; k++) {
-	  Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
-	  Glucose::Lit lf = Glucose::mkLit((i-1)*nnodes*ndata + k);
-	  S.addClause(~l, lf);
-	}
-      }
-    
-      // conditions for output nodes
-      for(int j : o_nodes) {
-	cardinality(S, i*nnodes*ndata + j*ndata, ndata);
-	for(int k = 0; k < ndata; k++) {
-	  Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
-	  Glucose::vec<Glucose::Lit> ls;
-	  ls.push(~l);
-	  for(int f : cons[j]) {
-	    Glucose::Lit lf = Glucose::mkLit((i-1)*nnodes*ndata + f*ndata + k);
-	    ls.push(lf);
-	  }
-	  S.addClause(ls);
-	}
-      }
-    
-      // conditions for external memory
+    // conditions for input nodes
+    for(int j : i_nodes) {
+      cardinality(S, i*nnodes*ndata + j*ndata, ndata);
       for(int k = 0; k < ndata; k++) {
-	Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + k);
+	Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
+	Glucose::Lit lf = Glucose::mkLit((i-1)*nnodes*ndata + k);
+	S.addClause(~l, lf);
+      }
+    }
+    
+    // conditions for output nodes
+    for(int j : o_nodes) {
+      cardinality(S, i*nnodes*ndata + j*ndata, ndata);
+      for(int k = 0; k < ndata; k++) {
+	Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
 	Glucose::vec<Glucose::Lit> ls;
 	ls.push(~l);
-	Glucose::Lit lp = Glucose::mkLit((i-1)*nnodes*ndata + k);
-	S.addClause(~lp, l);
-	ls.push(lp);
-	for(int j : o_nodes) {
-	  Glucose::Lit lo = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
-	  S.addClause(~lo, l);
-	  ls.push(lo);
+	for(int f : cons[j]) {
+	  Glucose::Lit lf = Glucose::mkLit((i-1)*nnodes*ndata + f*ndata + k);
+	  ls.push(lf);
 	}
 	S.addClause(ls);
       }
-    } else {
-      // conditions for input nodes
-      for(int j : i_nodes) {
-	cardinality(S, i*nnodes*ndata + j*ndata, ninputs);
-	for(int k = ninputs; k < ndata; k++) {
-	  S.addClause(Glucose::mkLit(i*nnodes*ndata + j*ndata + k, true));
-	}
-      }
+    }
     
-      // conditions for output nodes
+    // conditions for external memory
+    for(int k = 0; k < ndata; k++) {
+      Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + k);
+      Glucose::vec<Glucose::Lit> ls;
+      ls.push(~l);
+      Glucose::Lit lp = Glucose::mkLit((i-1)*nnodes*ndata + k);
+      S.addClause(~lp, l);
+      ls.push(lp);
       for(int j : o_nodes) {
-	cardinality_set(S, i*nnodes*ndata + j*ndata, output_ids);
-	for(int k : output_ids) {
-	  Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
-	  Glucose::vec<Glucose::Lit> ls;
-	  ls.push(~l);
-	  for(int f : cons[j]) {
-	    Glucose::Lit lf = Glucose::mkLit((i-1)*nnodes*ndata + f*ndata + k);
-	    ls.push(lf);
-	  }
-	  S.addClause(ls);
-	}
-	for(int k = 0; k < ndata; k++) {
-	  if(find(output_ids.begin(), output_ids.end(), k) == output_ids.end()) {	
-	    S.addClause(Glucose::mkLit(i*nnodes*ndata + j*ndata + k, true));
-	  }
-	}
+	Glucose::Lit lo = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
+	S.addClause(~lo, l);
+	ls.push(lo);
       }
-    
-      // conditions for external memory
-      for(int k = 0; k < ndata; k++) {
-	Glucose::Lit l = Glucose::mkLit(i*nnodes*ndata + k);
-	Glucose::vec<Glucose::Lit> ls;
-	ls.push(~l);
-	Glucose::Lit lp = Glucose::mkLit((i-1)*nnodes*ndata + k);
-	S.addClause(~lp, l);
-	ls.push(lp);
-	for(int j : o_nodes) {
-	  Glucose::Lit lo = Glucose::mkLit(i*nnodes*ndata + j*ndata + k);
-	  S.addClause(~lo, l);
-	  ls.push(lo);
-	}
-	S.addClause(ls);
-      }
+      S.addClause(ls);
     }
     
     // conditions for PE nodes
@@ -360,7 +316,7 @@ void gen_cnf(Glucose::SimpSolver &S, int ncycle, int nnodes, int ndata, int ninp
 
   // conditions for output ready
   for(int k : output_ids) {
-    Glucose::Lit l = Glucose::mkLit((ncycle-1)*nnodes*ndata + k);
+    Glucose::Lit l = Glucose::mkLit((ncycles-1)*nnodes*ndata + k);
     S.addClause(l);
   }
 }
