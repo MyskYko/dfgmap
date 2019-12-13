@@ -7,12 +7,6 @@
 #include "op.hpp"
 #include "sat.hpp"
 
-#include "utils/System.h"
-#include "utils/ParseUtils.h"
-#include "utils/Options.h"
-#include "core/Dimacs.h"
-#include "simp/SimpSolver.h"
-
 using namespace std;
 
 
@@ -425,18 +419,25 @@ int main(int argc, char** argv) {
 	df << "label=\"";
 	int j = 0;
 	int k = 0;
-	for(char c : datanames[sat.image[i][id][0]]) {
-	  if(j >= 14*w) {
-	    df << "\\l";
-	    j = 0;
-	    k++;
-	    if(k >= 6*h - 1) {
-	      df << "...";
-	      break;
-	    }
+	for(int l = 0; l < sat.image[i][id].size(); l++) {
+	  int d = sat.image[i][id][l]; 
+	  string dataname = datanames[d];
+	  if(l != sat.image[i][id].size()-1) {
+	    dataname += ", ";
 	  }
-	  df << c;
-	  j++;
+	  for(char c : dataname) {
+	    if(j >= 14*w) {
+	      df << "\\l";
+	      j = 0;
+	      k++;
+	      if(k >= 6*h - 1) {
+		df << "...";
+		break;
+	      }
+	    }
+	    df << c;
+	    j++;
+	  }
 	}
 	df << "\\l";
 	df << "\"";
