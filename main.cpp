@@ -13,13 +13,13 @@ using namespace std;
 int main(int argc, char** argv) {
   string efilename = "e.txt";
   string ffilename = "f.txt";
-  int ncycles = 0;
   string pfilename;
   string cfilename;
   int fcompress = 0;
   int fmac = 1;
   int fexmem = 0;
   int finc = 1;
+  int ncycles = 0;
   int nregs = 0;
   int nverbose = 0;
 
@@ -393,6 +393,11 @@ int main(int argc, char** argv) {
   }
   pfile.close();
 
+  time_t ctime = time(NULL);
+  string outdir = "out" + to_string(ctime);
+  string cmd = "mkdir " + outdir;
+  system(cmd.c_str());
+
   // generate image
   for(int i = 0; i < ncycles; i++) {
     // generate dot file
@@ -467,8 +472,19 @@ int main(int argc, char** argv) {
     df.close();
 
     // generate png file
-    string cmd = "neato out.dot -n -T png -o out" + to_string(i) + ".png";
+    string cmd = "neato out.dot -n -T png -o " + outdir + "/out" + to_string(i) + ".png";
     system(cmd.c_str());
   }
+
+  string lfilename = outdir + "/log.txt";
+  ofstream lfile(lfilename);
+  for(int i = 0; i < argc; i++) {
+    lfile << argv[i] << " ";
+  }
+  lfile << endl;
+  lfile.close();
+  
+  cout << "pngs are dumped at " << outdir << endl;
+  
   return 0;
 }
