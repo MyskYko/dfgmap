@@ -17,8 +17,9 @@ int main(int argc, char** argv) {
   string pfilename;
   string cfilename;
   int fcompress = 0;
-  int fmac = 0;
+  int fmac = 1;
   int fexmem = 0;
+  int finc = 1;
   int nregs = 0;
   int nverbose = 0;
 
@@ -58,13 +59,16 @@ int main(int argc, char** argv) {
 	cfilename = argv[++i];
 	break;
       case 'c':
-	fcompress = 1;
+	fcompress ^= 1;
 	break;
       case 'm':
-	fmac = 1;
+	fmac ^= 1;
 	break;
       case 'x':
-	fexmem = 1;
+	fexmem ^= 1;
+	break;
+      case 't':
+	finc ^= 1;
 	break;
       case 'r':
 	if(i+1 >= argc || argv[i+1][0] == '-') {
@@ -74,7 +78,7 @@ int main(int argc, char** argv) {
 	try {
 	  nregs = stoi(argv[++i]);
 	} catch(...) {
-	  show_error("-r must be followed by integer");
+	  show_error("-r should be followed by integer");
 	}
 	break;
       case 'v':
@@ -99,6 +103,7 @@ int main(int argc, char** argv) {
 	cout << "\t-c       : toggle transforming dataflow [default = " << fcompress << "]" << endl;
 	cout << "\t-m       : toggle using MAC operation [default = " << fmac << "]" << endl;
 	cout << "\t-x       : toggle using external memory to store intermediate data [default = " << fexmem << "]" << endl;
+	cout << "\t-t       : toggle incremental synthesis [default = " << finc << "]" << endl;
 	cout << "\t-r <int> : the number of additional registers for each PE (minus will be treated as no limit) [default = " << nregs << "]" << endl;
 	cout << "\t-v <int> : toggle verbosing information [default = " << nverbose << "]" << endl;
 	cout << "\t           \t0 : nothing" << endl;
@@ -298,46 +303,58 @@ int main(int argc, char** argv) {
 
   // instanciate SAT solver
   Sat sat = Sat(i_nodes, o_nodes, pe_nodes, cons, ninputs, output_ids, operands);
-
+  
+  if(finc) {
+    ncycles = 1;
+  }
+  
   if(ncycles < 1) {
     cout << "your files are valid" << endl;
     cout << "to run synthesis, please specify the number of cycles by using option -n" << endl;
     return 0;
   }
-  
-  // generate cnf
-  if(fexmem) {
-    if(nregs) {
-      sat.gen_cnf_reg_exmem(ncycles, nregs);
-    } else {    
-      sat.gen_cnf_exmem(ncycles);
-    }
-  } else if(nregs) {
-    sat.gen_cnf_reg(ncycles, nregs);
-  } else {
-    sat.gen_cnf(ncycles);
-  }
-  
-  // write cnf file
-  if(!cfilename.empty()) {
-    sat.write(cfilename);
-    return 0;
-  }
-  
-  // run sat solver
-  clock_t start = clock();
-  bool r = sat.solve();
-  clock_t end = clock();
-  
-  // show results
-  std::cout << "SAT solver took " << (double)(end - start) / CLOCKS_PER_SEC << "s" << std::endl;
-  if(r) {
-    std::cout << "SAT" << std::endl;
-  } else {
-    std::cout << "UNSAT" << std::endl;
-    return 0;
-  }
 
+  while(1) {
+    cout << "ncycles : " << ncycles << endl;
+    // generate cnf
+    if(fexmem) {
+      if(nregs) {
+	sat.gen_cnf_reg_exmem(ncycles, nregs);
+      } else {    
+	sat.gen_cnf_exmem(ncycles);
+      }
+    } else if(nregs) {
+      sat.gen_cnf_reg(ncycles, nregs);
+    } else {
+      sat.gen_cnf(ncycles);
+    }
+    
+    // write cnf file
+    if(!cfilename.empty()) {
+      sat.write(cfilename);
+      return 0;
+    }
+    
+    // run sat solver
+    clock_t start = clock();
+    bool r = sat.solve();
+    clock_t end = clock();
+    
+    // show results
+    std::cout << "SAT solver took " << (double)(end - start) / CLOCKS_PER_SEC << "s" << std::endl;
+    if(r) {
+      std::cout << "SAT" << std::endl;
+      break;
+    } else {
+      std::cout << "UNSAT" << std::endl;
+      if(!finc) {
+	return 0;
+      }
+    }
+    ncycles++;
+    sat.clean();
+  }
+  
   sat.gen_image();
   
   if(nverbose) {
@@ -432,6 +449,7 @@ int main(int argc, char** argv) {
 	      k++;
 	      if(k >= 6*h - 1) {
 		df << "...";
+		l = sat.image[i][id].size();
 		break;
 	      }
 	    }

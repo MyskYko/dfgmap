@@ -22,9 +22,11 @@ public:
   void gen_cnf_reg(int ncycles, int nregs);
   void gen_cnf_reg_exmem(int ncycles, int nregs);
   
-  bool solve() { return S.solve(); };
-  void write(std::string cfilename) { S.toDimacs(cfilename.c_str()); };
+  bool solve() { return S->solve(); };
   void gen_image();
+
+  void write(std::string cfilename) { S->toDimacs(cfilename.c_str()); };
+  void clean() { delete S; S = new Glucose::SimpSolver; };
 private:
   int nnodes;
   int ndata;
@@ -35,8 +37,8 @@ private:
   std::vector<std::set<int> > cons;
   std::set<int> output_ids;
   std::vector<std::set<std::set<int> > > operands;
-  
-  Glucose::SimpSolver S;
+
+  Glucose::SimpSolver *S;
   
   int ncycles_;
   int freg;
