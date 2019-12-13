@@ -19,7 +19,7 @@ public:
   
   void gen_cnf(int ncycles);
   void gen_cnf_exmem(int ncycles);
-  void gen_cnf_reg(int ncycles);
+  void gen_cnf_reg(int ncycles, int nregs);
   
   bool solve() { return S.solve(); };
   void write(std::string cfilename) { S.toDimacs(cfilename.c_str()); };

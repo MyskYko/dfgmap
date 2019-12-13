@@ -93,6 +93,56 @@ int cardinality_set(Glucose::SimpSolver &S, int i, set<int> s) {
   return 0;
 }
 
+int cardinality_k(Glucose::SimpSolver &S, int i, int n, int k) {
+  vector<int> vVars;
+  // first level
+  vVars.push_back(i);
+  S.newVar();
+  Glucose::Lit l0 = Glucose::mkLit(S.nVars()-1);
+  S.addClause(~l0);
+  for(int l = 1; l < k; l++) {
+    vVars.push_back(S.nVars()-1);
+  }
+  // subsequent levels
+  for(int j = 1; j < n; j++) {
+    // prohibit overflow (sum>k)
+    Glucose::Lit lk = Glucose::mkLit(vVars[k-1]);
+    Glucose::Lit lx = Glucose::mkLit(i+j);
+    S.addClause(~lk, ~lx);
+    if(j == n-1) {
+      break;
+    }
+    for(int l = k-1; l > 0; l--) {
+      // compute AND of x and l-1 of previous level
+      S.newVar();
+      Glucose::Lit la = Glucose::mkLit(S.nVars()-1);
+      Glucose::Lit lb = Glucose::mkLit(vVars[l-1]);
+      S.addClause(~la, lx);
+      S.addClause(~la, lb);
+      S.addClause(la, ~lx, ~lb);
+      // compute OR of it and l of previous level
+      S.newVar();
+      Glucose::Lit ln = Glucose::mkLit(S.nVars()-1);
+      Glucose::Lit ll = Glucose::mkLit(vVars[l]);
+      S.addClause(ln, ~la);
+      S.addClause(ln, ~ll);
+      S.addClause(~ln, la, ll);
+      // keep it at l of this level
+      vVars[l] = S.nVars()-1;
+    }
+    // compute OR of x and 0 of previous level
+    S.newVar();
+    Glucose::Lit ln = Glucose::mkLit(S.nVars()-1);
+    Glucose::Lit ll = Glucose::mkLit(vVars[0]);
+    S.addClause(ln, ~lx);
+    S.addClause(ln, ~ll);
+    S.addClause(~ln, lx, ll);
+    // keep it at 0 of this level
+    vVars[0] = S.nVars()-1;
+  }
+  return 0;
+}
+
 void Sat::gen_cnf(int ncycles) {
   ncycles_ = ncycles;
   
@@ -364,7 +414,7 @@ void Sat::gen_cnf_exmem(int ncycles) {
   }
 }
 
-void Sat::gen_cnf_reg(int ncycles) {
+void Sat::gen_cnf_reg(int ncycles, int nregs) {
   ncycles_ = ncycles;
   freg = 1;
   
@@ -492,6 +542,9 @@ void Sat::gen_cnf_reg(int ncycles) {
 
       // registers
       for(int k = 0; k < ndata; k++) {
+	if(nregs > 0) {
+	  cardinality_k(S, i*nnodes_*ndata + (j+npes)*ndata, ndata, nregs);
+	}
 	Glucose::Lit l = Glucose::mkLit(i*nnodes_*ndata + (j+npes)*ndata + k);
 	Glucose::Lit lk = Glucose::mkLit(vVars[k]);
 	S.addClause(~l, lk);

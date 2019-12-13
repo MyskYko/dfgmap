@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
 	cout << "\t-c       : toggle transforming dataflow [default = " << fcompress << "]" << endl;
 	cout << "\t-m       : toggle using MAC operation [default = " << fmac << "]" << endl;
 	cout << "\t-x       : toggle using external memory to store intermediate data [default = " << fexmem << "]" << endl;
-	cout << "\t-r <int> : the number of additional registers for each PE [default = " << nregs << "]" << endl;
+	cout << "\t-r <int> : the number of additional registers for each PE (minus will be treated as no limit) [default = " << nregs << "]" << endl;
 	cout << "\t-v <int> : toggle verbosing information [default = " << nverbose << "]" << endl;
 	cout << "\t           \t0 : nothing" << endl;
 	cout << "\t           \t1 : results" << endl;
@@ -312,12 +312,11 @@ int main(int argc, char** argv) {
     sat.gen_cnf_exmem(ncycles);
   }
   else if(nregs) {
-    sat.gen_cnf_reg(ncycles);
+    sat.gen_cnf_reg(ncycles, nregs);
   }
   else {
     sat.gen_cnf(ncycles);
   }
-  // todo : freg
   
   // write cnf file
   if(!cfilename.empty()) {
