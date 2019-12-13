@@ -16,8 +16,11 @@ public:
   std::vector<std::vector<std::vector<int> > > image;
 
   Sat(std::vector<int> i_nodes, std::vector<int> o_nodes, std::vector<int> pe_nodes, std::vector<std::set<int> > cons, int ninputs, std::set<int> output_ids, std::vector<std::set<std::set<int> > > operands);
+  
   void gen_cnf(int ncycles);
   void gen_cnf_exmem(int ncycles);
+  void gen_cnf_reg(int ncycles);
+  
   bool solve() { return S.solve(); };
   void write(std::string cfilename) { S.toDimacs(cfilename.c_str()); };
   void gen_image();
@@ -35,6 +38,7 @@ private:
   Glucose::SimpSolver S;
   
   int ncycles_;
+  int freg;
 };
 
 #endif // SAT_HPP

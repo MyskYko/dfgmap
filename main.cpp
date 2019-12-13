@@ -25,6 +25,7 @@ int main(int argc, char** argv) {
   int fcompress = 0;
   int fmac = 0;
   int fexmem = 0;
+  int nregs = 0;
   int nverbose = 0;
 
   // read options
@@ -71,6 +72,13 @@ int main(int argc, char** argv) {
       case 'x':
 	fexmem = 1;
 	break;
+      case 'r':
+	try {
+	  nregs = stoi(argv[++i]);
+	} catch(...) {
+	  show_error("-r must be followed by integer");
+	}
+	break;
       case 'v':
 	if(i+1 >= argc || argv[i+1][0] == '-') {
 	  nverbose = 1;
@@ -93,6 +101,7 @@ int main(int argc, char** argv) {
 	cout << "\t-c       : toggle transforming dataflow [default = " << fcompress << "]" << endl;
 	cout << "\t-m       : toggle using MAC operation [default = " << fmac << "]" << endl;
 	cout << "\t-x       : toggle using external memory to store intermediate data [default = " << fexmem << "]" << endl;
+	cout << "\t-r <int> : the number of additional registers for each PE [default = " << nregs << "]" << endl;
 	cout << "\t-v <int> : toggle verbosing information [default = " << nverbose << "]" << endl;
 	cout << "\t           \t0 : nothing" << endl;
 	cout << "\t           \t1 : results" << endl;
@@ -289,18 +298,21 @@ int main(int argc, char** argv) {
     }
   }
 
+  // instanciate SAT solver
+  Sat sat = Sat(i_nodes, o_nodes, pe_nodes, cons, ninputs, output_ids, operands);
+
   if(ncycles < 1) {
     cout << "your files are valid" << endl;
     cout << "to run synthesis, please specify the number of cycles by using option -n" << endl;
     return 0;
   }
-
-  // instanciate SAT solver
-  Sat sat = Sat(i_nodes, o_nodes, pe_nodes, cons, ninputs, output_ids, operands);
-
+  
   // generate cnf
   if(fexmem) {
     sat.gen_cnf_exmem(ncycles);
+  }
+  else if(nregs) {
+    sat.gen_cnf_reg(ncycles);
   }
   else {
     sat.gen_cnf(ncycles);
