@@ -314,6 +314,7 @@ int main(int argc, char** argv) {
     return 0;
   }
 
+  vector<double> timestamp;
   while(1) {
     cout << "ncycles : " << ncycles << endl;
     // generate cnf
@@ -341,7 +342,9 @@ int main(int argc, char** argv) {
     clock_t end = clock();
     
     // show results
-    std::cout << "SAT solver took " << (double)(end - start) / CLOCKS_PER_SEC << "s" << std::endl;
+    double duration = (double)(end - start) / CLOCKS_PER_SEC;
+    timestamp.push_back(duration);
+    std::cout << "SAT solver took " << duration << "s" << std::endl;
     if(r) {
       std::cout << "SAT" << std::endl;
       break;
@@ -482,6 +485,9 @@ int main(int argc, char** argv) {
     lfile << argv[i] << " ";
   }
   lfile << endl;
+  for(double t : timestamp) {
+    lfile << t << endl;
+  }
   lfile.close();
   
   cout << "pngs are dumped at " << outdir << endl;
