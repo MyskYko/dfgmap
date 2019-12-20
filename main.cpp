@@ -5,7 +5,7 @@
 
 #include "global.hpp"
 #include "op.hpp"
-#include "sat.hpp"
+#include "gen.hpp"
 
 using namespace std;
 
