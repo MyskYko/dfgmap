@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <fstream>
 
 #include "sat.hpp"
 #include "global.hpp"
@@ -706,4 +707,236 @@ void Sat::gen_cnf_reg_exmem(int ncycles, int nregs) {
     Glucose::Lit l = Glucose::mkLit((ncycles-1)*nnodes_*ndata + k);
     S->addClause(l);
   }
+}
+
+void Sat::gen_ilp(int ncycles) {
+  ncycles_ = ncycles;
+
+  ofstream flp("test.lp");
+
+  flp << "maximize" << endl;
+  flp << "subject to" << endl;
+  int nclauses = 0;
+  int nvars = 0;
+
+  // init condition
+  for(int i = 0; i < nnodes; i++) {
+    for(int j = 0; j < ndata; j++) {
+      flp << "c" << nclauses++ << ": ";
+      flp << "d(" << 0 << "," << i << "," << j << ") ";
+      flp << "= ";
+      flp << 0;
+      flp << endl;
+    }
+  }
+  
+  // conditions for each cycle
+  for(int i = 1; i < ncycles; i++) {
+    // conditions for input nodes
+    for(int j : i_nodes) {
+      // cardiality for intpus
+      flp << "c" << nclauses++ << ": ";
+      for(int k = 0; k < ninputs; k++) {
+	flp << "+ ";
+	flp << "d(" << i << "," << j << "," << k << ") ";
+      }
+      flp << "<= ";
+      flp << 1;
+      flp << endl;
+      // zero for the others
+      for(int k = ninputs; k < ndata; k++) {
+	flp << "c" << nclauses++ << ": ";
+	flp << "d(" << i << "," << j << "," << k << ") ";
+	flp << "= ";
+	flp << 0;
+	flp << endl;
+      }
+    }
+
+    // conditions for output nodes
+    for(int j : o_nodes) {
+      // cardinality for outputs
+      flp << "c" << nclauses++ << ": ";
+      for(int k : output_ids) {
+	flp << "+ ";
+	flp << "d(" << i << "," << j << "," << k << ") ";
+      }
+      flp << "<= ";
+      flp << 1;
+      flp << endl;
+      // communication possibility
+      for(int k : output_ids) {
+	flp << "c" << nclauses++ << ": ";
+	for(int f : cons[j]) {
+	  flp << "+ ";
+	  flp << "d(" << i-1 << "," << f << "," << k << ") ";
+	}
+	flp << "- ";
+	flp << "d(" << i << "," << j << "," << k << ") ";
+	flp << ">= ";
+	flp << 0;
+	flp << endl;
+      }
+      // zero for the others
+      for(int k = 0; k < ndata; k++) {
+	if(find(output_ids.begin(), output_ids.end(), k) == output_ids.end()) {
+	  flp << "c" << nclauses++ << ": ";
+	  flp << "d(" << i << "," << j << "," << k << ") ";
+	  flp << "= ";
+	  flp << 0;
+	  flp << endl;
+	}
+      }
+    }
+
+    // conditions for external memory
+    for(int k = 0; k < ndata; k++) {
+      // communication possibility
+      flp << "c" << nclauses++ << ": ";
+      for(int j : o_nodes) {
+	flp << "+ ";
+	flp << "d(" << i << "," << j << "," << k << ") ";
+      }
+      flp << "+ ";
+      flp << "d(" << i-1 << "," << 0 << "," << k << ") ";
+      flp << "- ";
+      flp << "d(" << i << "," << 0 << "," << k << ") ";
+      flp << ">= ";
+      flp << 0;
+      flp << endl;
+      // keep all ... maybe unnecessary
+      flp << "c" << nclauses++ << ": ";
+      flp << "d(" << i << "," << 0 << "," << k << ") ";
+      flp << "- ";
+      flp << "d(" << i-1 << "," << 0 << "," << k << ") ";
+      flp << ">= ";
+      flp << 0;
+      flp << endl;
+      for(int j : o_nodes) {
+	flp << "c" << nclauses++ << ": ";
+	flp << "d(" << i << "," << 0 << "," << k << ") ";
+	flp << "- ";
+	flp << "d(" << i << "," << j << "," << k << ") ";
+	flp << ">= ";
+	flp << 0;
+	flp << endl;
+      }
+    }
+    
+    // conditions for PE nodes
+    for(int j : pe_nodes) {
+      // cardiality
+      flp << "c" << nclauses++ << ": ";
+      for(int k = 0; k < ndata; k++) {
+	flp << "+ ";
+	flp << "d(" << i << "," << j << "," << k << ") ";
+      }
+      flp << "<= ";
+      flp << 1;
+      flp << endl;
+      // create OR of existence of data among adjacent nodes and itself
+      vector<int> vVars;
+      for(int k = 0; k < ndata; k++) {
+	// 1 -> OR
+	flp << "c" << nclauses++ << ": ";
+	flp << "d(" << i-1 << "," << j << "," << k << ") ";
+	for(int f : cons[j]) {
+	  flp << "+ ";
+	  flp << "d(" << i-1 << "," << f << "," << k << ") ";
+	}
+	flp << "- ";
+	flp << "v(" << nvars << ") ";
+	flp << ">= ";
+	flp << 0;
+	flp << endl;
+	// OR -> 1 .. maybe unnecessary
+	flp << "c" << nclauses++ << ": ";
+	flp << "v(" << nvars << ") ";
+	flp << "- ";
+	flp << "d(" << i-1 << "," << j << "," << k << ") ";
+	flp << ">= ";
+	flp << 0;
+	flp << endl;
+	for(int f : cons[j]) {
+	  flp << "c" << nclauses++ << ": ";
+	  flp << "v(" << nvars << ") ";
+	  flp << "- ";
+	  flp << "d(" << i-1 << "," << f << "," << k << ") ";
+	  flp << ">= ";
+	  flp << 0;
+	  flp << endl;
+	}
+	vVars.push_back(nvars++);
+      }
+      // conditions for communication and operation
+      for(int k = 0; k < ndata; k++) {
+	vector<int> vVars2;
+	// communication possibility
+	vVars2.push_back(vVars[k]);
+	// operation possibility
+	for(auto s : operands[k]) {
+	  // AND -> 1
+	  flp << "c" << nclauses++ << ": ";
+	  flp << "v(" << nvars << ") ";
+	  for(int o : s) {
+	    flp << "- ";	    
+	    flp << "v(" << vVars[o] << ") ";
+	  }
+	  flp << ">= ";
+	  flp << "- ";
+	  flp << s.size() - 1;
+	  flp << endl;
+	  // 1 -> AND
+	  for(int o : s) {
+	    flp << "c" << nclauses++ << ": ";
+	    flp << "v(" << vVars[o] << ") ";
+	    flp << "- ";
+	    flp << "v(" << nvars << ") ";
+	    flp << ">= ";
+	    flp << 0;
+	    flp << endl;
+	  }
+	  vVars2.push_back(nvars++);
+	}
+	// any one possibility is satisfied
+	flp << "c" << nclauses++ << ": ";
+	for(int v : vVars2) {
+	  flp << "+ ";	    
+	  flp << "v(" << v << ") ";
+	}
+	flp << "- ";
+	flp << "d(" << i << "," << j << "," << k << ") ";
+	flp << ">= ";
+	flp << 0;
+	flp << endl;
+      }
+    }
+  }
+
+  // conditions for output ready
+  for(int k : output_ids) {
+    flp << "c" << nclauses++ << ": ";
+    flp << "d(" << ncycles-1 << "," << 0 << "," << k << ") ";
+    flp << "= ";
+    flp << 1;
+    flp << endl;
+  }
+
+  flp << "binary" << endl;
+  for(int i = 0; i < ncycles; i++) {
+    for(int j = 0; j < nnodes; j++) {
+      for(int k = 0; k < ndata; k++) {
+	flp << "d(" << i << "," << j << "," << k << ") ";
+	flp << endl;
+      }
+    }
+  }
+
+  for(int i = 0; i < nvars; i++) {
+    flp << "v(" << i << ") ";
+    flp << endl;
+  }
+  
+  flp << "end" << endl;
+  return;
 }

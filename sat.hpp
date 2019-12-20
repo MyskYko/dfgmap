@@ -22,6 +22,8 @@ public:
   void gen_cnf_reg(int ncycles, int nregs);
   void gen_cnf_reg_exmem(int ncycles, int nregs);
   
+  void gen_ilp(int ncycles);
+  
   bool solve() { return S->solve(); };
   void gen_image();
 
