@@ -6,3 +6,5 @@ main.o:main.cpp
 	g++ -g -I ~/glucose-syrup -c main.cpp
 sat.o:sat.cpp
 	g++ -g -I ~/glucose-syrup -c sat.cpp
+clean:
+	rm -f *.o gen

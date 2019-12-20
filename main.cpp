@@ -304,7 +304,7 @@ int main(int argc, char** argv) {
   // instanciate SAT solver
   Sat sat = Sat(i_nodes, o_nodes, pe_nodes, cons, ninputs, output_ids, operands);
   
-  if(finc) {
+  if(finc && ncycles < 1) {
     ncycles = 1;
   }
   
@@ -402,6 +402,7 @@ int main(int argc, char** argv) {
   system(cmd.c_str());
 
   // generate image
+  double magnify = 1;
   for(int i = 0; i < ncycles; i++) {
     // generate dot file
     ofstream df("out.dot");
@@ -414,20 +415,29 @@ int main(int argc, char** argv) {
     df << "," << endl;
     df << "fontsize=10";
     df << "," << endl;
+    df << "style=filled";
+    df << "," << endl;
+    df << "fillcolor=white";
+    df << "," << endl;
     df << "labelloc=\"t\"";
     df << endl;
     df << "];" << endl;
     df << endl;
+    int ftoolarge = 0;
     for(auto line : pl) {
       if(line.empty()) {
 	continue;
       }
       int id = node_name2id[line[0]];
       assert(id);
-      float x = stof(line[1]);
-      float y = stof(line[2]);
-      float w = stof(line[3]);
-      float h = stof(line[4]);
+      float x = stof(line[1]) * magnify;
+      float y = stof(line[2]) * magnify;
+      float w = stof(line[3]) * magnify;
+      float h = stof(line[4]) * magnify;
+      string color;
+      if(line.size() > 5) {
+	color = line[5];
+      }
       x = (x + w/2) * 72;
       y = (y + h/2) * 72;
       df << line[0];
@@ -438,6 +448,10 @@ int main(int argc, char** argv) {
       df << "," << endl;
       df << "height=" << h;
       df << "," << endl;
+      if(!color.empty()) {
+	df << "fillcolor=\"#" << color << "\"";
+	df << "," << endl;
+      }
       if(sat.image[i][id].empty()) {
 	df << "label=\"\"";
       } else {
@@ -447,36 +461,46 @@ int main(int argc, char** argv) {
 	for(int l = 0; l < sat.image[i][id].size(); l++) {
 	  int d = sat.image[i][id][l]; 
 	  string dataname = datanames[d];
-	  if(l != sat.image[i][id].size()-1) {
-	    dataname += ", ";
-	  }
 	  for(char c : dataname) {
 	    if(j >= 14*w) {
 	      df << "\\l";
 	      j = 0;
 	      k++;
 	      if(k >= 6*h - 1) {
-		df << "...";
-		l = sat.image[i][id].size();
+		ftoolarge = 1;
 		break;
 	      }
 	    }
 	    df << c;
 	    j++;
 	  }
+	  df << "\\l";
+	  j = 0;
+	  k++;
+	  if(k >= 6*h - 1) {
+	    ftoolarge = 1;
+	    break;
+	  }
 	}
-	df << "\\l";
 	df << "\"";
+      }
+      if(ftoolarge) {
+	break;
       }
       df << endl;
       df << "];" << endl;
     }
     df << "}" << endl;
     df.close();
-
+    if(ftoolarge) {
+      magnify += 1;
+      i--;
+      continue;
+    }
     // generate png file
     string cmd = "neato out.dot -n -T png -o " + outdir + "/out" + to_string(i) + ".png";
     system(cmd.c_str());
+    magnify = 1;
   }
 
   string lfilename = outdir + "/log.txt";
