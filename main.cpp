@@ -15,7 +15,12 @@ int main(int argc, char** argv) {
   string efilename = "e.txt";
   string ffilename = "f.txt";
   string pfilename;
-  string cfilename;
+  string cfilename = "_test.cnf";
+  string rfilename = "_test.out";
+  string satcmd = "lingeling " + cfilename + " > " + rfilename;
+  //string satcmd = "glucose " + cfilename + " " + rfilename;
+  //string satcmd = "minisat " + cfilename + " " + rfilename;
+  string ilpcmd = "";
   int fcompress = 0;
   int fmac = 1;
   int fexmem = 0;
@@ -100,7 +105,7 @@ int main(int argc, char** argv) {
 	cout << "\t-e <str> : the name of environment file [default = \"" << efilename << "\"]" << endl;
 	cout << "\t-f <str> : the name of formula file [default = \"" << ffilename << "\"]" << endl;
 	cout << "\t-p <str> : the name of placement file to generate pngs [default = \"" << pfilename << "\"]" << endl;
-	cout << "\t-w <str> : the name of cnf file to dump without sysnthesis [default = \"" << cfilename << "\"]" << endl;
+	cout << "\t-w <str> : the name of cnf file [default = \"" << cfilename << "\"]" << endl;
 	cout << "\t-c       : toggle transforming dataflow [default = " << fcompress << "]" << endl;
 	cout << "\t-m       : toggle using MAC operation [default = " << fmac << "]" << endl;
 	cout << "\t-x       : toggle using external memory to store intermediate data [default = " << fexmem << "]" << endl;
@@ -319,23 +324,40 @@ int main(int argc, char** argv) {
   while(1) {
     cout << "ncycles : " << ncycles << endl;
     // generate cnf
-    sat.gen_cnf(ncycles, nregs, fexmem);
-
-    // write cnf file
-    if(!cfilename.empty()) {
-      //      sat.write(cfilename);
-      return 0;
-    }
+    sat.gen_cnf(ncycles, nregs, fexmem, cfilename);
     
     // run sat solver
-    clock_t start = clock();
-    bool r = false;//sat.solve();
-    clock_t end = clock();
+    system(satcmd.c_str());
+
+    int r = 0;
+    ifstream rfile(rfilename);
+    if(!rfile) {
+      show_error("cannot open result file");
+    }
+    while(getline(rfile, str)) {
+      string s;
+      stringstream ss(str);
+      vector<string> vs;
+      getline(ss, s, ' ');
+      if(s == "SAT" || s == "1" || s == "-1") {
+	r = 1;
+	break;
+      } else if(s == "UNSAT") {
+	r = 0;
+	break;
+      } else if(s == "s") {
+	getline(ss, s, ' ');
+	if(s == "SATISFIABLE") {
+	  r = 1;
+	  break;
+	} else if(s == "UNSATISFIABLE") {
+	  r = 0;
+	  break;
+	}
+      }
+    }
     
     // show results
-    double duration = (double)(end - start) / CLOCKS_PER_SEC;
-    timestamp.push_back(duration);
-    std::cout << "SAT solver took " << duration << "s" << std::endl;
     if(r) {
       std::cout << "SAT" << std::endl;
       break;
@@ -346,10 +368,9 @@ int main(int argc, char** argv) {
       }
     }
     ncycles++;
-    //    sat.clean();
   }
   
-  sat.gen_image();
+  sat.gen_image(rfilename);
   
   if(nverbose) {
     cout << "### results ###" << endl;

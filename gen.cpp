@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <fstream>
+#include <sstream>
 
 #include "gen.hpp"
 #include "global.hpp"
@@ -42,7 +43,7 @@ Gen::Gen(vector<int> i_nodes, vector<int> o_nodes, vector<int> pe_nodes, vector<
   }
 }
 
-int cardinality_am1(int &nvars, vector<int> vVars, ofstream &fcnf) {
+int cardinality_am1(int &nvars, int &nclauses, vector<int> vVars, ofstream &fcnf) {
   while(vVars.size() > 1) {
     int k = 0;
     for(int j = 0; j < vVars.size()/2; j++) {
@@ -50,16 +51,20 @@ int cardinality_am1(int &nvars, vector<int> vVars, ofstream &fcnf) {
       fcnf << "-" << vVars[2*j] << " ";
       fcnf << "-" << vVars[2*j+1] << " ";
       fcnf << 0 << endl;
+      nclauses++;
       fcnf << "-" << nvars << " ";
       fcnf << vVars[2*j] << " ";
       fcnf << vVars[2*j+1] << " ";
       fcnf << 0 << endl;
+      nclauses++;
       fcnf << nvars << " ";
       fcnf << "-" << vVars[2*j] << " ";
       fcnf << 0 << endl;
+      nclauses++;
       fcnf << nvars << " ";
       fcnf << "-" << vVars[2*j+1] << " ";
       fcnf << 0 << endl;
+      nclauses++;
       vVars[k++] = nvars;
     }
     if(vVars.size()%2) {
@@ -70,13 +75,14 @@ int cardinality_am1(int &nvars, vector<int> vVars, ofstream &fcnf) {
   return 0;
 }
 
-int cardinality_amk(int &nvars, vector<int> vVars, ofstream &fcnf, int k) {
+int cardinality_amk(int &nvars, int &nclauses, vector<int> vVars, ofstream &fcnf, int k) {
   vector<int> vCounts;
   // first level
   vCounts.push_back(vVars[0]);
   nvars++;
   fcnf << "-" << nvars << " ";
   fcnf << 0 << endl;
+  nclauses++;
   for(int i = 1; i < k; i++) {
     vCounts.push_back(nvars);
   }
@@ -87,6 +93,7 @@ int cardinality_amk(int &nvars, vector<int> vVars, ofstream &fcnf, int k) {
     fcnf << "-" << vCounts[k-1] << " ";
     fcnf << "-" << x << " ";
     fcnf << 0 << endl;
+    nclauses++;
     if(j == vVars.size()-1) {
       break;
     }
@@ -97,25 +104,31 @@ int cardinality_amk(int &nvars, vector<int> vVars, ofstream &fcnf, int k) {
       fcnf << "-" << a << " ";
       fcnf << x << " ";
       fcnf << 0 << endl;
+      nclauses++;
       fcnf << "-" << a << " ";
       fcnf << vCounts[i-1] << " ";
       fcnf << 0 << endl;
+      nclauses++;
       fcnf << a << " ";
       fcnf << "-" << x << " ";
       fcnf << "-" << vCounts[i-1] << " ";
       fcnf << 0 << endl;
+      nclauses++;
       // compute OR of it and l of previous level
       nvars++;
       fcnf << "-" << a << " ";
       fcnf << nvars << " ";
       fcnf << 0 << endl;
+      nclauses++;
       fcnf << "-" << vCounts[i] << " ";
       fcnf << nvars << " ";
       fcnf << 0 << endl;
+      nclauses++;
       fcnf << "-" << nvars << " ";
       fcnf << a << " ";
       fcnf << vCounts[i] << " ";
       fcnf << 0 << endl;
+      nclauses++;
       // keep it at l of this level
       vCounts[i] = nvars;
     }
@@ -124,61 +137,85 @@ int cardinality_amk(int &nvars, vector<int> vVars, ofstream &fcnf, int k) {
     fcnf << "-" << x << " ";
     fcnf << nvars << " ";
     fcnf << 0 << endl;
+    nclauses++;
     fcnf << "-" << vCounts[0] << " ";
     fcnf << nvars << " ";
     fcnf << 0 << endl;
+    nclauses++;
     fcnf << "-" << nvars << " ";
     fcnf << x << " ";
     fcnf << vCounts[0] << " ";
     fcnf << 0 << endl;
+    nclauses++;
     // keep it at 0 of this level
     vCounts[0] = nvars;
   }
   return 0;
 }
 
-void Gen::gen_image() {
-  int nnodes_ = nnodes;
-  if(freg) {
-    nnodes_ += pe_nodes.size();
+void Gen::gen_image(string rfilename) {
+  vector<int> results;
+  ifstream rfile(rfilename);
+  if(!rfile) {
+    show_error("cannot open result file");
   }
+  string str;
+  while(getline(rfile, str)) {
+    string s;
+    stringstream ss(str);
+    vector<string> vs;
+    getline(ss, s, ' ');
+    if(s == "1" || s == "-1") {
+      results.push_back(stoi(s));
+      while(getline(ss, s, ' ')) {
+	try {
+	  results.push_back(stoi(s));
+	} catch(...) {
+	  show_error("wrong formatted result file");
+	}
+      }
+    } else if(s == "v") {
+      while(getline(ss, s, ' ')) {
+	try {
+	  results.push_back(stoi(s));
+	} catch(...) {
+	  show_error("wrong formatted result file");
+	}
+      }
+    }
+  }
+  
   image.resize(ncycles_, vector<vector<int> >(nnodes));
   for(int i = 0; i < ncycles_; i++) {
     for(int j = 0; j < nnodes; j++) {
       for(int k = 0; k < ndata; k++) {
-	/*
-	if(S->model[i*nnodes_*ndata + j*ndata + k] == l_True) {
+	if(results[i*nnodes_*ndata + j*ndata + k] > 0) {
 	  image[i][j].push_back(k);
 	}
-	*/
       }
     }
-    if(freg) {
-      for(int j = nnodes; j < nnodes_; j++) {
-	for(int k = 0; k < ndata; k++) {
-	  /*
-	  if(S->model[i*nnodes_*ndata + j*ndata + k] == l_True) {
-	    image[i][j-pe_nodes.size()].push_back(k);
-	  }
-	  */
+    for(int j = nnodes; j < nnodes_; j++) {
+      for(int k = 0; k < ndata; k++) {
+	if(results[i*nnodes_*ndata + j*ndata + k] > 0) {
+	  image[i][j-pe_nodes.size()].push_back(k);
 	}
       }
     }
   }
 }
 
-void Gen::gen_cnf(int ncycles, int nregs, int fexmem) {
+void Gen::gen_cnf(int ncycles, int nregs, int fexmem, string cnfname) {
   ncycles_ = ncycles;
+  nnodes_ = nnodes;
   int npes = pe_nodes.size();
-  int nnodes_ = nnodes;
   if(nregs) {
     freg = 1;
     nnodes_ += npes;
   }
   
-  ofstream fcnf("test.cnf");
-  
+  ofstream fcnf(cnfname);
   int nvars = ncycles * nnodes_ * ndata;
+  int nclauses = 0;
   
   // init condition
   for(int j = 0; j < ninputs; j++) {
@@ -187,16 +224,19 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem) {
     } else {
       fcnf << "-" << j + 1 << " ";
     }
-    fcnf << 0 << endl; 
+    fcnf << 0 << endl;
+    nclauses++;
   }
   for(int j = ninputs; j < ndata; j++) {
     fcnf << "-" << j + 1 << " ";
     fcnf << 0 << endl; 
+    nclauses++;
   }
   for(int i = 1; i < nnodes_; i++) {
     for(int j = 0; j < ndata; j++) {
       fcnf << "-" << i*ndata + j + 1 << " ";
       fcnf << 0 << endl; 
+      nclauses++;
     }
   }
 
@@ -210,12 +250,13 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem) {
 	for(int k = 0; k < ndata; k++) {
 	  vVars.push_back(i*nnodes_*ndata + j*ndata + k + 1);
 	}
-	cardinality_am1(nvars, vVars, fcnf);
+	cardinality_am1(nvars, nclauses, vVars, fcnf);
 	// communication possibility
 	for(int k = 0; k < ndata; k++) {
 	  fcnf << "-" << i*nnodes_*ndata + j*ndata + k + 1 << " ";
 	  fcnf << (i-1)*nnodes_*ndata + k + 1 << " ";
 	  fcnf << 0 << endl; 
+	  nclauses++;
 	}
       } else {
 	// cardinality for inputs
@@ -223,11 +264,12 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem) {
 	for(int k = 0; k < ninputs; k++) {
 	  vVars.push_back(i*nnodes_*ndata + j*ndata + k + 1);
 	}
-	cardinality_am1(nvars, vVars, fcnf);
+	cardinality_am1(nvars, nclauses, vVars, fcnf);
 	// false the others
 	for(int k = ninputs; k < ndata; k++) {
 	  fcnf << "-" << i*nnodes_*ndata + j*ndata + k + 1 << " ";
 	  fcnf << 0 << endl; 
+	  nclauses++;
 	}
       }
     }
@@ -240,7 +282,7 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem) {
 	for(int k = 0; k < ndata; k++) {
 	  vVars.push_back(i*nnodes_*ndata + j*ndata + k + 1);
 	}
-	cardinality_am1(nvars, vVars, fcnf);
+	cardinality_am1(nvars, nclauses, vVars, fcnf);
 	// communication possibility
 	for(int k = 0; k < ndata; k++) {
 	  fcnf << "-" << i*nnodes_*ndata + j*ndata + k + 1 << " ";	  
@@ -251,6 +293,7 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem) {
 	    }
 	  }
 	  fcnf << 0 << endl; 
+	  nclauses++;
 	}
       } else {
 	// cardinality for outputs
@@ -258,7 +301,7 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem) {
 	for(int k : output_ids) {
 	  vVars.push_back(i*nnodes_*ndata + j*ndata + k + 1);	
 	}
-	cardinality_am1(nvars, vVars, fcnf);
+	cardinality_am1(nvars, nclauses, vVars, fcnf);
 	// communication possibility for outputs
 	for(int k : output_ids) {
 	  fcnf << "-" << i*nnodes_*ndata + j*ndata + k + 1 << " ";
@@ -269,12 +312,14 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem) {
 	    }
 	  }
 	  fcnf << 0 << endl;
+	  nclauses++;
 	}
 	// false the others
 	for(int k = 0; k < ndata; k++) {
 	  if(find(output_ids.begin(), output_ids.end(), k) == output_ids.end()) {
 	    fcnf << "-" << i*nnodes_*ndata + j*ndata + k + 1 << " ";
 	    fcnf << 0 << endl;
+	    nclauses++;
 	  }
 	}
       }
@@ -291,13 +336,16 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem) {
 	}
 	// reverse
 	fcnf << 0 << endl;
+	nclauses++;
 	fcnf << "-" << (i-1)*nnodes_*ndata + k + 1 << " ";      
 	fcnf << i*nnodes_*ndata + k + 1 << " ";
 	fcnf << 0 << endl;
+	nclauses++;
 	for(int j : o_nodes) {      
 	  fcnf << "-" << i*nnodes_*ndata + j*ndata + k + 1 << " ";
 	  fcnf << i*nnodes_*ndata + k + 1 << " ";
 	  fcnf << 0 << endl;
+	  nclauses++;
 	}
       }
     } else {
@@ -310,13 +358,16 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem) {
 	}
 	// reverse
 	fcnf << 0 << endl;
+	nclauses++;
 	fcnf << "-" << (i-1)*nnodes_*ndata + k + 1 << " ";      
 	fcnf << i*nnodes_*ndata + k + 1 << " ";
 	fcnf << 0 << endl;
+	nclauses++;
 	for(int j : o_nodes) {      
 	  fcnf << "-" << i*nnodes_*ndata + j*ndata + k + 1 << " ";
 	  fcnf << i*nnodes_*ndata + k + 1 << " ";
 	  fcnf << 0 << endl;
+	  nclauses++;
 	}
       }
       // false the others
@@ -324,6 +375,7 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem) {
 	if(find(output_ids.begin(), output_ids.end(), k) == output_ids.end()) {
 	  fcnf << "-" << i*nnodes_*ndata + k + 1 << " ";
 	  fcnf << 0 << endl;
+	  nclauses++;
 	}
       }
     }
@@ -335,7 +387,7 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem) {
       for(int k = 0; k < ndata; k++) {
 	vVars.push_back(i*nnodes_*ndata + j*ndata + k + 1);
       }
-      cardinality_am1(nvars, vVars, fcnf);
+      cardinality_am1(nvars, nclauses, vVars, fcnf);
       // create OR of existence of data among adjacent nodes and itself
       vVars.clear();
       for(int k = 0; k < ndata; k++) {
@@ -353,23 +405,28 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem) {
 	  }
 	}
 	fcnf << 0 << endl;
+	nclauses++;
 	// 1 -> OR
 	fcnf << "-" << (i-1)*nnodes_*ndata + j*ndata + k + 1 << " ";
 	fcnf << nvars << " ";
 	fcnf << 0 << endl;
+	nclauses++;
 	if(freg) {
 	  fcnf << "-" << (i-1)*nnodes_*ndata + (j+npes)*ndata + k + 1 << " ";
 	  fcnf << nvars << " ";
 	  fcnf << 0 << endl;
+	  nclauses++;
 	}
 	for(int f : cons[j]) {
 	  fcnf << "-" << (i-1)*nnodes_*ndata + f*ndata + k + 1 << " ";
 	  fcnf << nvars << " ";
 	  fcnf << 0 << endl;
+	  nclauses++;
 	  if(freg && find(pe_nodes.begin(), pe_nodes.end(), j) != pe_nodes.end()) {
 	    fcnf << "-" << (i-1)*nnodes_*ndata + (f+npes)*ndata + k + 1 << " ";
 	    fcnf << nvars << " ";
 	    fcnf << 0 << endl;
+	    nclauses++;
 	  }
 	}
 	vVars.push_back(nvars);
@@ -388,11 +445,13 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem) {
 	    fcnf << "-" << vVars[o] << " ";
 	  }
 	  fcnf << 0 << endl;
+	  nclauses++;
 	  // 1 -> AND
 	  for(int o : s) {
 	    fcnf << vVars[o] << " ";
 	    fcnf << "-" << nvars << " ";
 	    fcnf << 0 << endl;
+	    nclauses++;
 	  }
 	  vVars2.push_back(nvars);
 	}
@@ -402,6 +461,7 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem) {
 	  fcnf << v << " ";
 	}
 	fcnf << 0 << endl;
+	nclauses++;
       }
       // registers
       if(nregs > 0) {
@@ -410,12 +470,13 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem) {
 	for(int k = 0; k < ndata; k++) {
 	  vVars2.push_back(i*nnodes_*ndata + (j+npes)*ndata + k + 1);
 	}
-	cardinality_amk(nvars, vVars2, fcnf, nregs);
+	cardinality_amk(nvars, nclauses, vVars2, fcnf, nregs);
 	// communication possibility
 	for(int k = 0; k < ndata; k++) {
 	  fcnf << "-" << i*nnodes_*ndata + (j+npes)*ndata + k + 1 << " ";
 	  fcnf << vVars[k] << " ";
 	  fcnf << 0 << endl;
+	  nclauses++;
 	}
       }
     }
@@ -425,7 +486,14 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem) {
   for(int k : output_ids) {
     fcnf << (ncycles-1)*nnodes_*ndata + k + 1 << " ";
     fcnf << 0 << endl;
+    nclauses++;
   }
+
+  fcnf.close();
+
+  string header = "p cnf " + to_string(nvars) + " " + to_string(nclauses);
+  string cmd = "sed -i \'1i" + header + "\' " + cnfname;
+  system(cmd.c_str());
 }
 
 void Gen::gen_ilp(int ncycles) {
@@ -657,5 +725,5 @@ void Gen::gen_ilp(int ncycles) {
   }
   
   flp << "end" << endl;
-  return;
+  flp.close();
 }
