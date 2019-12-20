@@ -321,7 +321,7 @@ int main(int argc, char** argv) {
     int r = 0;
     if(!ilpcmd.empty()) {
       // ILP solver
-      gen.gen_ilp(ncycles, ifilename);
+      gen.gen_ilp(ncycles, nregs, fexmem, ifilename);
       ifstream sfile(sfilename);
       if(sfile) {
 	sfile.close();
@@ -333,6 +333,7 @@ int main(int argc, char** argv) {
       system(ilpcmd.c_str());
       sfile.open(sfilename);
       if(sfile) {
+	sfile.close();
 	r = 1;
       }
     } else {

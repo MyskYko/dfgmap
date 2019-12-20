@@ -224,7 +224,6 @@ void Gen::gen_image_ilp(string sfilename) {
 	getline(ss, s, ' ');
 	string dname = s.substr(6);
 	dname = dname.substr(0, dname.size()-1);
-	cout << dname << endl;
 	getline(ss, s, ' ');
 	getline(ss, s, ' ');
 	string vname = s.substr(7,s.size()-5);
@@ -453,7 +452,7 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem, string cnfname) {
 	}
 	for(int f : cons[j]) {
 	  fcnf << (i-1)*nnodes_*ndata + f*ndata + k + 1 << " ";
-	  if(freg && find(pe_nodes.begin(), pe_nodes.end(), j) != pe_nodes.end()) {
+	  if(freg && find(pe_nodes.begin(), pe_nodes.end(), f) != pe_nodes.end()) {
 	    fcnf << (i-1)*nnodes_*ndata + (f+npes)*ndata + k + 1 << " ";
 	  }
 	}
@@ -475,7 +474,7 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem, string cnfname) {
 	  fcnf << nvars << " ";
 	  fcnf << 0 << endl;
 	  nclauses++;
-	  if(freg && find(pe_nodes.begin(), pe_nodes.end(), j) != pe_nodes.end()) {
+	  if(freg && find(pe_nodes.begin(), pe_nodes.end(), f) != pe_nodes.end()) {
 	    fcnf << "-" << (i-1)*nnodes_*ndata + (f+npes)*ndata + k + 1 << " ";
 	    fcnf << nvars << " ";
 	    fcnf << 0 << endl;
@@ -517,13 +516,15 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem, string cnfname) {
 	nclauses++;
       }
       // registers
-      if(nregs > 0) {
-	// cardinality
-	vector<int> vVars2;
-	for(int k = 0; k < ndata; k++) {
-	  vVars2.push_back(i*nnodes_*ndata + (j+npes)*ndata + k + 1);
+      if(freg) {
+	if(nregs > 0) {
+	  // cardinality
+	  vector<int> vVars2;
+	  for(int k = 0; k < ndata; k++) {
+	    vVars2.push_back(i*nnodes_*ndata + (j+npes)*ndata + k + 1);
+	  }
+	  cardinality_amk(nvars, nclauses, vVars2, fcnf, nregs);
 	}
-	cardinality_amk(nvars, nclauses, vVars2, fcnf, nregs);
 	// communication possibility
 	for(int k = 0; k < ndata; k++) {
 	  fcnf << "-" << i*nnodes_*ndata + (j+npes)*ndata + k + 1 << " ";
@@ -549,8 +550,14 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem, string cnfname) {
   system(cmd.c_str());
 }
 
-void Gen::gen_ilp(int ncycles, string lpname) {
+void Gen::gen_ilp(int ncycles, int nregs, int fexmem, string lpname) {
   ncycles_ = ncycles;
+  nnodes_ = nnodes;
+  int npes = pe_nodes.size();
+  if(nregs) {
+    freg = 1;
+    nnodes_ += npes;
+  }
 
   ofstream flp(lpname);
 
@@ -560,7 +567,25 @@ void Gen::gen_ilp(int ncycles, string lpname) {
   int nvars = 0;
 
   // init condition
-  for(int i = 0; i < nnodes; i++) {
+  for(int j = 0; j < ninputs; j++) {
+    flp << "c" << nclauses++ << ": ";
+    flp << "d(" << 0 << "," << 0 << "," << j << ") ";
+    flp << "= ";
+    if(fexmem) {
+      flp << 1;
+    } else {
+      flp << 0;
+    }
+    flp << endl;
+  }
+  for(int j = ninputs; j < ndata; j++) {
+    flp << "c" << nclauses++ << ": ";
+    flp << "d(" << 0 << "," << 0 << "," << j << ") ";
+    flp << "= ";
+    flp << 0;
+    flp << endl;
+  }
+  for(int i = 1; i < nnodes_; i++) {
     for(int j = 0; j < ndata; j++) {
       flp << "c" << nclauses++ << ": ";
       flp << "d(" << 0 << "," << i << "," << j << ") ";
@@ -574,52 +599,38 @@ void Gen::gen_ilp(int ncycles, string lpname) {
   for(int i = 1; i < ncycles; i++) {
     // conditions for input nodes
     for(int j : i_nodes) {
-      // cardiality for intpus
-      flp << "c" << nclauses++ << ": ";
-      for(int k = 0; k < ninputs; k++) {
-	flp << "+ ";
-	flp << "d(" << i << "," << j << "," << k << ") ";
-      }
-      flp << "<= ";
-      flp << 1;
-      flp << endl;
-      // zero for the others
-      for(int k = ninputs; k < ndata; k++) {
+      if(fexmem) {
+	// cardinality
 	flp << "c" << nclauses++ << ": ";
-	flp << "d(" << i << "," << j << "," << k << ") ";
-	flp << "= ";
-	flp << 0;
-	flp << endl;
-      }
-    }
-
-    // conditions for output nodes
-    for(int j : o_nodes) {
-      // cardinality for outputs
-      flp << "c" << nclauses++ << ": ";
-      for(int k : output_ids) {
-	flp << "+ ";
-	flp << "d(" << i << "," << j << "," << k << ") ";
-      }
-      flp << "<= ";
-      flp << 1;
-      flp << endl;
-      // communication possibility
-      for(int k : output_ids) {
-	flp << "c" << nclauses++ << ": ";
-	for(int f : cons[j]) {
+	for(int k = 0; k < ndata; k++) {
 	  flp << "+ ";
-	  flp << "d(" << i-1 << "," << f << "," << k << ") ";
+	  flp << "d(" << i << "," << j << "," << k << ") ";
 	}
-	flp << "- ";
-	flp << "d(" << i << "," << j << "," << k << ") ";
-	flp << ">= ";
-	flp << 0;
+	flp << "<= ";
+	flp << 1;
 	flp << endl;
-      }
-      // zero for the others
-      for(int k = 0; k < ndata; k++) {
-	if(find(output_ids.begin(), output_ids.end(), k) == output_ids.end()) {
+	// communication possibility
+	for(int k = 0; k < ndata; k++) {
+	  flp << "c" << nclauses++ << ": ";
+	  flp << "d(" << i-1 << "," << 0 << "," << k << ") ";
+	  flp << "- ";
+	  flp << "d(" << i << "," << j << "," << k << ") ";
+	  flp << ">= ";
+	  flp << 0;
+	  flp << endl;
+	}
+      } else {
+	// cardiality for inputs
+	flp << "c" << nclauses++ << ": ";
+	for(int k = 0; k < ninputs; k++) {
+	  flp << "+ ";
+	  flp << "d(" << i << "," << j << "," << k << ") ";
+	}
+	flp << "<= ";
+	flp << 1;
+	flp << endl;
+	// zero for the others
+	for(int k = ninputs; k < ndata; k++) {
 	  flp << "c" << nclauses++ << ": ";
 	  flp << "d(" << i << "," << j << "," << k << ") ";
 	  flp << "= ";
@@ -629,37 +640,151 @@ void Gen::gen_ilp(int ncycles, string lpname) {
       }
     }
 
-    // conditions for external memory
-    for(int k = 0; k < ndata; k++) {
-      // communication possibility
-      flp << "c" << nclauses++ << ": ";
-      for(int j : o_nodes) {
-	flp << "+ ";
-	flp << "d(" << i << "," << j << "," << k << ") ";
-      }
-      flp << "+ ";
-      flp << "d(" << i-1 << "," << 0 << "," << k << ") ";
-      flp << "- ";
-      flp << "d(" << i << "," << 0 << "," << k << ") ";
-      flp << ">= ";
-      flp << 0;
-      flp << endl;
-      // keep all ... maybe unnecessary
-      flp << "c" << nclauses++ << ": ";
-      flp << "d(" << i << "," << 0 << "," << k << ") ";
-      flp << "- ";
-      flp << "d(" << i-1 << "," << 0 << "," << k << ") ";
-      flp << ">= ";
-      flp << 0;
-      flp << endl;
-      for(int j : o_nodes) {
+    // conditions for output nodes
+    for(int j : o_nodes) {
+      if(fexmem) {
+	// cardinality
 	flp << "c" << nclauses++ << ": ";
-	flp << "d(" << i << "," << 0 << "," << k << ") ";
+	for(int k = 0; k < ndata; k++) {
+	  flp << "+ ";
+	  flp << "d(" << i << "," << j << "," << k << ") ";
+	}
+	flp << "<= ";
+	flp << 1;
+	flp << endl;
+	// communication possibility
+	for(int k = 0; k < ndata; k++) {
+	  flp << "c" << nclauses++ << ": ";
+	  for(int f : cons[j]) {
+	    flp << "+ ";
+	    flp << "d(" << i-1 << "," << f << "," << k << ") ";
+	    if(freg) {
+	      flp << "+ ";
+	      flp << "d(" << i-1 << "," << f+npes << "," << k << ") ";
+	    }
+	  }
+	  flp << "- ";
+	  flp << "d(" << i << "," << j << "," << k << ") ";
+	  flp << ">= ";
+	  flp << 0;
+	  flp << endl;
+	}
+      } else {
+      // cardinality for outputs
+	flp << "c" << nclauses++ << ": ";
+	for(int k : output_ids) {
+	  flp << "+ ";
+	  flp << "d(" << i << "," << j << "," << k << ") ";
+	}
+	flp << "<= ";
+	flp << 1;
+	flp << endl;
+	// communication possibility
+	for(int k : output_ids) {
+	  flp << "c" << nclauses++ << ": ";
+	  for(int f : cons[j]) {
+	    flp << "+ ";
+	    flp << "d(" << i-1 << "," << f << "," << k << ") ";
+	    if(freg) {
+	      flp << "+ ";
+	      flp << "d(" << i-1 << "," << f+npes << "," << k << ") ";
+	    }
+	  }
+	  flp << "- ";
+	  flp << "d(" << i << "," << j << "," << k << ") ";
+	  flp << ">= ";
+	  flp << 0;
+	  flp << endl;
+	}
+	// zero for the others
+	for(int k = 0; k < ndata; k++) {
+	  if(find(output_ids.begin(), output_ids.end(), k) == output_ids.end()) {
+	    flp << "c" << nclauses++ << ": ";
+	    flp << "d(" << i << "," << j << "," << k << ") ";
+	    flp << "= ";
+	    flp << 0;
+	    flp << endl;
+	  }
+	}
+      }
+    }
+
+    // conditions for external memory
+    if(fexmem) {
+      for(int k = 0; k < ndata; k++) {
+	// communication possibility
+	flp << "c" << nclauses++ << ": ";
+	for(int j : o_nodes) {
+	  flp << "+ ";
+	  flp << "d(" << i << "," << j << "," << k << ") ";
+	}
+	flp << "+ ";
+	flp << "d(" << i-1 << "," << 0 << "," << k << ") ";
 	flp << "- ";
-	flp << "d(" << i << "," << j << "," << k << ") ";
+	flp << "d(" << i << "," << 0 << "," << k << ") ";
 	flp << ">= ";
 	flp << 0;
 	flp << endl;
+	// keep all ... maybe unnecessary
+	flp << "c" << nclauses++ << ": ";
+	flp << "d(" << i << "," << 0 << "," << k << ") ";
+	flp << "- ";
+	flp << "d(" << i-1 << "," << 0 << "," << k << ") ";
+	flp << ">= ";
+	flp << 0;
+	flp << endl;
+	for(int j : o_nodes) {
+	  flp << "c" << nclauses++ << ": ";
+	  flp << "d(" << i << "," << 0 << "," << k << ") ";
+	  flp << "- ";
+	  flp << "d(" << i << "," << j << "," << k << ") ";
+	  flp << ">= ";
+	  flp << 0;
+	  flp << endl;
+	}
+      }
+    } else {
+      for(int k : output_ids) {
+	// communication possibility
+	flp << "c" << nclauses++ << ": ";
+	for(int j : o_nodes) {
+	  flp << "+ ";
+	  flp << "d(" << i << "," << j << "," << k << ") ";
+	}
+	flp << "+ ";
+	flp << "d(" << i-1 << "," << 0 << "," << k << ") ";
+	flp << "- ";
+	flp << "d(" << i << "," << 0 << "," << k << ") ";
+	flp << ">= ";
+	flp << 0;
+	flp << endl;
+	// keep all ... maybe unnecessary
+	flp << "c" << nclauses++ << ": ";
+	flp << "d(" << i << "," << 0 << "," << k << ") ";
+	flp << "- ";
+	flp << "d(" << i-1 << "," << 0 << "," << k << ") ";
+	flp << ">= ";
+	flp << 0;
+	flp << endl;
+	for(int j : o_nodes) {
+	  flp << "c" << nclauses++ << ": ";
+	  flp << "d(" << i << "," << 0 << "," << k << ") ";
+	  flp << "- ";
+	  flp << "d(" << i << "," << j << "," << k << ") ";
+	  flp << ">= ";
+	  flp << 0;
+	  flp << endl;
+	}
+      }
+      // false the others
+      for(int k = 0; k < ndata; k++) {
+	if(find(output_ids.begin(), output_ids.end(), k) == output_ids.end()) {
+	  flp << "c" << nclauses++ << ": ";
+	  flp << "d(" << i << "," << 0 << "," << k << ") ";
+	  flp << "= ";
+	  flp << 0;
+	  flp << endl;
+	}
       }
     }
     
@@ -680,9 +805,17 @@ void Gen::gen_ilp(int ncycles, string lpname) {
 	// 1 -> OR
 	flp << "c" << nclauses++ << ": ";
 	flp << "d(" << i-1 << "," << j << "," << k << ") ";
+	if(freg) {
+	  flp << "+ ";
+	  flp << "d(" << i-1 << "," << j+npes << "," << k << ") ";
+	}
 	for(int f : cons[j]) {
 	  flp << "+ ";
 	  flp << "d(" << i-1 << "," << f << "," << k << ") ";
+	  if(freg && find(pe_nodes.begin(), pe_nodes.end(), f) != pe_nodes.end()) {
+	    flp << "+ ";
+	    flp << "d(" << i-1 << "," << f+npes << "," << k << ") ";
+	  }
 	}
 	flp << "- ";
 	flp << "v(" << nvars << ") ";
@@ -697,6 +830,15 @@ void Gen::gen_ilp(int ncycles, string lpname) {
 	flp << ">= ";
 	flp << 0;
 	flp << endl;
+	if(freg) {
+	  flp << "c" << nclauses++ << ": ";
+	  flp << "v(" << nvars << ") ";
+	  flp << "- ";
+	  flp << "d(" << i-1 << "," << j+npes << "," << k << ") ";
+	  flp << ">= ";
+	  flp << 0;
+	  flp << endl;
+	}
 	for(int f : cons[j]) {
 	  flp << "c" << nclauses++ << ": ";
 	  flp << "v(" << nvars << ") ";
@@ -705,6 +847,15 @@ void Gen::gen_ilp(int ncycles, string lpname) {
 	  flp << ">= ";
 	  flp << 0;
 	  flp << endl;
+	  if(freg && find(pe_nodes.begin(), pe_nodes.end(), f) != pe_nodes.end()) {
+	    flp << "c" << nclauses++ << ": ";
+	    flp << "v(" << nvars << ") ";
+	    flp << "- ";
+	    flp << "d(" << i-1 << "," << f+npes << "," << k << ") ";
+	    flp << ">= ";
+	    flp << 0;
+	    flp << endl;
+	  }
 	}
 	vVars.push_back(nvars++);
       }
@@ -750,6 +901,30 @@ void Gen::gen_ilp(int ncycles, string lpname) {
 	flp << 0;
 	flp << endl;
       }
+      // registers
+      if(freg) {
+	if(nregs > 0) {
+	  // cardinality
+	  flp << "c" << nclauses++ << ": ";
+	  for(int k = 0; k < ndata; k++) {
+	    flp << "+ ";
+	    flp << "d(" << i << "," << j+npes << "," << k << ") ";
+	  }
+	  flp << "<= ";
+	  flp << nregs;
+	  flp << endl;
+	}
+	// communication possibility
+	for(int k = 0; k < ndata; k++) {
+	  flp << "c" << nclauses++ << ": ";
+	  flp << "v(" << vVars[k] << ") ";
+	  flp << "- ";
+	  flp << "d(" << i << "," << j+npes << "," << k << ") ";
+	  flp << ">= ";
+	  flp << 0;
+	  flp << endl;
+	}
+      }
     }
   }
 
@@ -764,7 +939,7 @@ void Gen::gen_ilp(int ncycles, string lpname) {
 
   flp << "binary" << endl;
   for(int i = 0; i < ncycles; i++) {
-    for(int j = 0; j < nnodes; j++) {
+    for(int j = 0; j < nnodes_; j++) {
       for(int k = 0; k < ndata; k++) {
 	flp << "d(" << i << "," << j << "," << k << ") ";
 	flp << endl;

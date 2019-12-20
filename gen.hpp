@@ -12,10 +12,7 @@ public:
   Gen(std::vector<int> i_nodes, std::vector<int> o_nodes, std::vector<int> pe_nodes, std::vector<std::set<int> > cons, int ninputs, std::set<int> output_ids, std::vector<std::set<std::set<int> > > operands);
   
   void gen_cnf(int ncycles, int nregs, int fexmem, std::string cnfname);
-  void gen_cnf_exmem(int ncycles);
-  void gen_cnf_reg_exmem(int ncycles, int nregs);
-  
-  void gen_ilp(int ncycles, std::string lpname);
+  void gen_ilp(int ncycles, int nregs, int fexmem, std::string lpname);
   
   void gen_image(std::string rfilename);
   void gen_image_ilp(std::string sfilename);
