@@ -2,6 +2,7 @@
 #include <sstream>
 #include <iomanip>
 #include <time.h>
+#include <cassert>
 
 #include "global.hpp"
 #include "op.hpp"
@@ -302,7 +303,7 @@ int main(int argc, char** argv) {
   }
 
   // instanciate SAT solver
-  Sat sat = Sat(i_nodes, o_nodes, pe_nodes, cons, ninputs, output_ids, operands);
+  Gen sat = Gen(i_nodes, o_nodes, pe_nodes, cons, ninputs, output_ids, operands);
   
   if(finc && ncycles < 1) {
     ncycles = 1;
@@ -318,27 +319,17 @@ int main(int argc, char** argv) {
   while(1) {
     cout << "ncycles : " << ncycles << endl;
     // generate cnf
-    if(fexmem) {
-      if(nregs) {
-	sat.gen_cnf_reg_exmem(ncycles, nregs);
-      } else {    
-	sat.gen_cnf_exmem(ncycles);
-      }
-    } else if(nregs) {
-      sat.gen_cnf_reg(ncycles, nregs);
-    } else {
-      sat.gen_cnf(ncycles);
-    }
-    
+    sat.gen_cnf(ncycles, nregs, fexmem);
+
     // write cnf file
     if(!cfilename.empty()) {
-      sat.write(cfilename);
+      //      sat.write(cfilename);
       return 0;
     }
     
     // run sat solver
     clock_t start = clock();
-    bool r = sat.solve();
+    bool r = false;//sat.solve();
     clock_t end = clock();
     
     // show results
@@ -355,7 +346,7 @@ int main(int argc, char** argv) {
       }
     }
     ncycles++;
-    sat.clean();
+    //    sat.clean();
   }
   
   sat.gen_image();
