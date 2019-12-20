@@ -17,8 +17,8 @@ int main(int argc, char** argv) {
   string pfilename;
   string cfilename = "_test.cnf";
   string rfilename = "_test.out";
-  string satcmd = "lingeling " + cfilename + " > " + rfilename;
-  //string satcmd = "glucose " + cfilename + " " + rfilename;
+  string satcmd = "glucose " + cfilename + " " + rfilename;
+  //string satcmd = "lingeling " + cfilename + " > " + rfilename;
   //string satcmd = "minisat " + cfilename + " " + rfilename;
   string ilpcmd = "";
   int fcompress = 0;
@@ -57,12 +57,6 @@ int main(int argc, char** argv) {
 	  show_error("-p must be followed by file name");
 	}
 	pfilename = argv[++i];
-	break;
-      case 'w':
-	if(i+1 >= argc) {
-	  show_error("-w must be followed by file name");
-	}
-	cfilename = argv[++i];
 	break;
       case 'c':
 	fcompress ^= 1;
@@ -105,7 +99,6 @@ int main(int argc, char** argv) {
 	cout << "\t-e <str> : the name of environment file [default = \"" << efilename << "\"]" << endl;
 	cout << "\t-f <str> : the name of formula file [default = \"" << ffilename << "\"]" << endl;
 	cout << "\t-p <str> : the name of placement file to generate pngs [default = \"" << pfilename << "\"]" << endl;
-	cout << "\t-w <str> : the name of cnf file [default = \"" << cfilename << "\"]" << endl;
 	cout << "\t-c       : toggle transforming dataflow [default = " << fcompress << "]" << endl;
 	cout << "\t-m       : toggle using MAC operation [default = " << fmac << "]" << endl;
 	cout << "\t-x       : toggle using external memory to store intermediate data [default = " << fexmem << "]" << endl;
@@ -307,8 +300,8 @@ int main(int argc, char** argv) {
     }
   }
 
-  // instanciate SAT solver
-  Gen sat = Gen(i_nodes, o_nodes, pe_nodes, cons, ninputs, output_ids, operands);
+  // instanciate problem generator
+  Gen gen = Gen(i_nodes, o_nodes, pe_nodes, cons, ninputs, output_ids, operands);
   
   if(finc && ncycles < 1) {
     ncycles = 1;
@@ -324,7 +317,7 @@ int main(int argc, char** argv) {
   while(1) {
     cout << "ncycles : " << ncycles << endl;
     // generate cnf
-    sat.gen_cnf(ncycles, nregs, fexmem, cfilename);
+    gen.gen_cnf(ncycles, nregs, fexmem, cfilename);
     
     // run sat solver
     system(satcmd.c_str());
@@ -370,15 +363,15 @@ int main(int argc, char** argv) {
     ncycles++;
   }
   
-  sat.gen_image(rfilename);
+  gen.gen_image(rfilename);
   
   if(nverbose) {
     cout << "### results ###" << endl;
-    for(int i = 0; i < sat.image.size(); i++) {
+    for(int i = 0; i < gen.image.size(); i++) {
       cout << "cycle " << i << " :" << endl;
-      for(int j = 0; j < sat.image[0].size(); j++) {
+      for(int j = 0; j < gen.image[0].size(); j++) {
 	cout << "\tnode " << j << " :";
-	for(int k : sat.image[i][j]) {
+	for(int k : gen.image[i][j]) {
 	  cout << " " << k << "(" << datanames[k] << ")";
 	}
 	cout << endl;
@@ -464,14 +457,14 @@ int main(int argc, char** argv) {
 	df << "fillcolor=\"#" << color << "\"";
 	df << "," << endl;
       }
-      if(sat.image[i][id].empty()) {
+      if(gen.image[i][id].empty()) {
 	df << "label=\"\"";
       } else {
 	df << "label=\"";
 	int j = 0;
 	int k = 0;
-	for(int l = 0; l < sat.image[i][id].size(); l++) {
-	  int d = sat.image[i][id][l]; 
+	for(int l = 0; l < gen.image[i][id].size(); l++) {
+	  int d = gen.image[i][id][l]; 
 	  string dataname = datanames[d];
 	  for(char c : dataname) {
 	    if(j >= 14*w) {
