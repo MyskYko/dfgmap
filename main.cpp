@@ -25,6 +25,7 @@ int main(int argc, char** argv) {
   //string satcmd = "lingeling " + cfilename + " > " + rfilename;
   //string satcmd = "minisat " + cfilename + " " + rfilename;
   string ilpcmd = "cplex -c \"read " + ifilename + "\" \"optimize\" \"write " + sfilename + "\"";
+  int filp = 0;
   int fcompress = 0;
   int fmac = 1;
   int fexmem = 0;
@@ -61,6 +62,9 @@ int main(int argc, char** argv) {
 	  show_error("-p must be followed by file name");
 	}
 	pfilename = argv[++i];
+	break;
+      case 'i':
+	filp ^= 1;
 	break;
       case 'c':
 	fcompress ^= 1;
@@ -103,6 +107,7 @@ int main(int argc, char** argv) {
 	cout << "\t-e <str> : the name of environment file [default = \"" << efilename << "\"]" << endl;
 	cout << "\t-f <str> : the name of formula file [default = \"" << ffilename << "\"]" << endl;
 	cout << "\t-p <str> : the name of placement file to generate pngs [default = \"" << pfilename << "\"]" << endl;
+	cout << "\t-i       : toggle using ILP solver instead of SAT solver [default = " << filp << "]" << endl;
 	cout << "\t-c       : toggle transforming dataflow [default = " << fcompress << "]" << endl;
 	cout << "\t-m       : toggle using MAC operation [default = " << fmac << "]" << endl;
 	cout << "\t-x       : toggle using external memory to store intermediate data [default = " << fexmem << "]" << endl;
@@ -321,7 +326,7 @@ int main(int argc, char** argv) {
   while(1) {
     cout << "ncycles : " << ncycles << endl;
     int r = 0;
-    if(!ilpcmd.empty()) {
+    if(filp) {
       // ILP solver
       gen.gen_ilp(ncycles, nregs, fexmem, ifilename);
       ifstream sfile(sfilename);
@@ -380,7 +385,7 @@ int main(int argc, char** argv) {
     ncycles++;
   }
 
-  if(!ilpcmd.empty()) {
+  if(filp) {
     gen.gen_image_ilp(sfilename);
   } else {
     gen.gen_image(rfilename);
