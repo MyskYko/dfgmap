@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <fstream>
 #include <sstream>
+#include <map>
 
 #include "gen.hpp"
 #include "global.hpp"
@@ -203,6 +204,58 @@ void Gen::gen_image(string rfilename) {
     }
   }
 }
+
+void Gen::gen_image_ilp(string sfilename) {
+  map<string, int> results;
+  ifstream sfile(sfilename);
+  if(!sfile) {
+    show_error("cannot open result file");
+  }
+  string str;
+  while(getline(sfile, str)) {
+    string s;
+    stringstream ss(str);
+    vector<string> vs;
+    getline(ss, s, ' ');
+    getline(ss, s, ' ');
+    getline(ss, s, ' ');
+    if(s == "<variable") {
+      try {
+	getline(ss, s, ' ');
+	string dname = s.substr(6);
+	dname = dname.substr(0, dname.size()-1);
+	cout << dname << endl;
+	getline(ss, s, ' ');
+	getline(ss, s, ' ');
+	string vname = s.substr(7,s.size()-5);
+	results[dname] = stoi(vname);
+      } catch(...) {
+	show_error("wrong formatted result file");
+      }
+    }
+  }
+  
+  image.resize(ncycles_, vector<vector<int> >(nnodes));
+  for(int i = 0; i < ncycles_; i++) {
+    for(int j = 0; j < nnodes; j++) {
+      for(int k = 0; k < ndata; k++) {
+	string dname = "d(" + to_string(i) + "," + to_string(j) + "," + to_string(k) + ")";
+	if(results[dname]) {
+	  image[i][j].push_back(k);
+	}
+      }
+    }
+    for(int j = nnodes; j < nnodes_; j++) {
+      for(int k = 0; k < ndata; k++) {
+	string dname = "d(" + to_string(i) + "," + to_string(j) + "," + to_string(k) + ")";
+	if(results[dname]) {
+	  image[i][j-pe_nodes.size()].push_back(k);
+	}
+      }
+    }
+  }
+}
+
 
 void Gen::gen_cnf(int ncycles, int nregs, int fexmem, string cnfname) {
   ncycles_ = ncycles;
@@ -496,10 +549,10 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem, string cnfname) {
   system(cmd.c_str());
 }
 
-void Gen::gen_ilp(int ncycles) {
+void Gen::gen_ilp(int ncycles, string lpname) {
   ncycles_ = ncycles;
 
-  ofstream flp("test.lp");
+  ofstream flp(lpname);
 
   flp << "maximize" << endl;
   flp << "subject to" << endl;

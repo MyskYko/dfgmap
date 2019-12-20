@@ -17,10 +17,12 @@ int main(int argc, char** argv) {
   string pfilename;
   string cfilename = "_test.cnf";
   string rfilename = "_test.out";
+  string ifilename = "_test.lp";
+  string sfilename = "_test.sol";
   string satcmd = "glucose " + cfilename + " " + rfilename;
   //string satcmd = "lingeling " + cfilename + " > " + rfilename;
   //string satcmd = "minisat " + cfilename + " " + rfilename;
-  string ilpcmd = "";
+  string ilpcmd = "cplex -c \"read " + ifilename + "\" \"optimize\" \"write " + sfilename + "\"";
   int fcompress = 0;
   int fmac = 1;
   int fexmem = 0;
@@ -316,54 +318,70 @@ int main(int argc, char** argv) {
   vector<double> timestamp;
   while(1) {
     cout << "ncycles : " << ncycles << endl;
-    // generate cnf
-    gen.gen_cnf(ncycles, nregs, fexmem, cfilename);
-    
-    // run sat solver
-    system(satcmd.c_str());
-
     int r = 0;
-    ifstream rfile(rfilename);
-    if(!rfile) {
-      show_error("cannot open result file");
-    }
-    while(getline(rfile, str)) {
-      string s;
-      stringstream ss(str);
-      vector<string> vs;
-      getline(ss, s, ' ');
-      if(s == "SAT" || s == "1" || s == "-1") {
+    if(!ilpcmd.empty()) {
+      // ILP solver
+      gen.gen_ilp(ncycles, ifilename);
+      ifstream sfile(sfilename);
+      if(sfile) {
+	sfile.close();
+	string cmd = "rm " + sfilename;
+	system(cmd.c_str());
+      } else {
+	sfile.close();
+      }
+      system(ilpcmd.c_str());
+      sfile.open(sfilename);
+      if(sfile) {
 	r = 1;
-	break;
-      } else if(s == "UNSAT") {
-	r = 0;
-	break;
-      } else if(s == "s") {
+      }
+    } else {
+      // SAT solver
+      gen.gen_cnf(ncycles, nregs, fexmem, cfilename);
+      system(satcmd.c_str());
+      ifstream rfile(rfilename);
+      if(!rfile) {
+	show_error("cannot open result file");
+      }
+      while(getline(rfile, str)) {
+	string s;
+	stringstream ss(str);
+	vector<string> vs;
 	getline(ss, s, ' ');
-	if(s == "SATISFIABLE") {
+	if(s == "SAT" || s == "1" || s == "-1") {
 	  r = 1;
 	  break;
-	} else if(s == "UNSATISFIABLE") {
-	  r = 0;
+	} else if(s == "UNSAT") {
 	  break;
+	} else if(s == "s") {
+	  getline(ss, s, ' ');
+	  if(s == "SATISFIABLE") {
+	    r = 1;
+	    break;
+	  } else if(s == "UNSATISFIABLE") {
+	    break;
+	  }
 	}
       }
     }
-    
     // show results
     if(r) {
-      std::cout << "SAT" << std::endl;
+      std::cout << "Solution found" << std::endl;
       break;
     } else {
-      std::cout << "UNSAT" << std::endl;
-      if(!finc) {
-	return 0;
-      }
+      std::cout << "No solution" << std::endl;
+    }
+    if(!finc) {
+      return 0;
     }
     ncycles++;
   }
-  
-  gen.gen_image(rfilename);
+
+  if(!ilpcmd.empty()) {
+    gen.gen_image_ilp(sfilename);
+  } else {
+    gen.gen_image(rfilename);
+  }
   
   if(nverbose) {
     cout << "### results ###" << endl;

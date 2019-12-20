@@ -15,9 +15,10 @@ public:
   void gen_cnf_exmem(int ncycles);
   void gen_cnf_reg_exmem(int ncycles, int nregs);
   
-  void gen_ilp(int ncycles);
+  void gen_ilp(int ncycles, std::string lpname);
   
   void gen_image(std::string rfilename);
+  void gen_image_ilp(std::string sfilename);
 
 private:
   int nnodes;
