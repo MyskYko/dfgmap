@@ -19,6 +19,8 @@ int main(int argc, char** argv) {
   string rfilename = "_test.out";
   string ifilename = "_test.lp";
   string sfilename = "_test.sol";
+  string dfilename = "_out.dot";
+  string ofilename = "out" + to_string(time(NULL));
   string satcmd = "glucose " + cfilename + " " + rfilename;
   //string satcmd = "lingeling " + cfilename + " > " + rfilename;
   //string satcmd = "minisat " + cfilename + " " + rfilename;
@@ -325,7 +327,7 @@ int main(int argc, char** argv) {
       ifstream sfile(sfilename);
       if(sfile) {
 	sfile.close();
-	string cmd = "rm " + sfilename;
+	string cmd = "rm -r " + sfilename;
 	system(cmd.c_str());
       } else {
 	sfile.close();
@@ -420,16 +422,22 @@ int main(int argc, char** argv) {
   }
   pfile.close();
 
-  time_t ctime = time(NULL);
-  string outdir = "out" + to_string(ctime);
-  string cmd = "mkdir " + outdir;
+  ifstream ofile(ofilename);
+  if(ofile) {
+    ofile.close();
+    string cmd = "rm -r " + ofilename;
+    system(cmd.c_str());
+  } else {
+    ofile.close();
+  }
+  string cmd = "mkdir " + ofilename;
   system(cmd.c_str());
 
   // generate image
   double magnify = 1;
   for(int i = 0; i < ncycles; i++) {
     // generate dot file
-    ofstream df("out.dot");
+    ofstream df(dfilename);
     df << "graph G {" << endl;
     df << "node";
     df << " [" << endl;
@@ -522,12 +530,12 @@ int main(int argc, char** argv) {
       continue;
     }
     // generate png file
-    string cmd = "neato out.dot -n -T png -o " + outdir + "/out" + to_string(i) + ".png";
+    string cmd = "neato " + dfilename + " -n -T png -o " + ofilename + "/out" + to_string(i) + ".png";
     system(cmd.c_str());
     magnify = 1;
   }
 
-  string lfilename = outdir + "/log.txt";
+  string lfilename = ofilename + "/log.txt";
   ofstream lfile(lfilename);
   for(int i = 0; i < argc; i++) {
     lfile << argv[i] << " ";
@@ -538,7 +546,7 @@ int main(int argc, char** argv) {
   }
   lfile.close();
   
-  cout << "pngs are dumped at " << outdir << endl;
+  cout << "pngs are dumped at " << ofilename << endl;
   
   return 0;
 }
