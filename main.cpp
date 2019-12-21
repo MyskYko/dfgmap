@@ -390,6 +390,8 @@ int main(int argc, char** argv) {
   } else {
     gen.gen_image(rfilename);
   }
+
+  gen.reduce_image();
   
   if(nverbose) {
     cout << "### results ###" << endl;

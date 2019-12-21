@@ -17,6 +17,8 @@ public:
   void gen_image(std::string rfilename);
   void gen_image_ilp(std::string sfilename);
 
+  void reduce_image();
+
 private:
   int nnodes;
   int ndata;
@@ -31,6 +33,7 @@ private:
   int ncycles_;
   int nnodes_;
   int freg;
+  int fexmem_;
 };
 
 #endif // GEN_HPP
