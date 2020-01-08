@@ -21,9 +21,10 @@ int main(int argc, char** argv) {
   string sfilename = "_test.sol";
   string dfilename = "_out.dot";
   string ofilename = "out" + to_string(time(NULL));
-  string satcmd = "glucose " + cfilename + " " + rfilename;
+  //string satcmd = "glucose " + cfilename + " " + rfilename;
   //string satcmd = "lingeling " + cfilename + " > " + rfilename;
   //string satcmd = "minisat " + cfilename + " " + rfilename;
+  string satcmd = "plingeling " + cfilename + " > " + rfilename;
   string ilpcmd = "cplex -c \"read " + ifilename + "\" \"optimize\" \"write " + sfilename + "\"";
   int filp = 0;
   int fcompress = 0;
