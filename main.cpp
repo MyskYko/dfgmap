@@ -14,6 +14,11 @@ using namespace std;
 int main(int argc, char** argv) {
   string efilename = "e.txt";
   string ffilename = "f.txt";
+  string specfilename = "_spec.blif";
+  string tmplfilename = "_tmpl.blif";
+  string topfilename = "_top.blif";
+  string logfilename = "_log.txt";
+  /*
   string pfilename;
   string cfilename = "_test.cnf";
   string rfilename = "_test.out";
@@ -21,9 +26,10 @@ int main(int argc, char** argv) {
   string sfilename = "_test.sol";
   string dfilename = "_out.dot";
   string ofilename = "out" + to_string(time(NULL));
-  string satcmd = "glucose " + cfilename + " " + rfilename;
+  //string satcmd = "glucose " + cfilename + " " + rfilename;
   //string satcmd = "lingeling " + cfilename + " > " + rfilename;
   //string satcmd = "minisat " + cfilename + " " + rfilename;
+  string satcmd = "plingeling " + cfilename + " > " + rfilename;
   string ilpcmd = "cplex -c \"read " + ifilename + "\" \"optimize\" \"write " + sfilename + "\"";
   int filp = 0;
   int fcompress = 0;
@@ -123,18 +129,19 @@ int main(int argc, char** argv) {
       }
     }
   }
-
+  */
+  int nverbose = 2;
   // read environment file
   ifstream efile(efilename);
   if(!efile) {
     show_error("cannot open environment file");
   }
+  int nregs;
+  int nops;
+  vector<opnode *> operators;
   map<string, int> node_name2id;
-  int nnodes = 1; // external memory
-  vector<int> i_nodes;
-  vector<int> o_nodes;
-  vector<int> pe_nodes;
-  vector<set<int> > cons;
+  int nnodes = 0;
+  vector<pair<int, int> > coms;
   string str;
   while(getline(efile, str)) {
     string s;
@@ -146,38 +153,67 @@ int main(int argc, char** argv) {
     if(vs.empty()) {
       continue;
     }
-    if(vs[0] == ".i") {
-      for(int i = 1; i < vs.size(); i++) {
-	node_name2id[vs[i]] = nnodes;
-	i_nodes.push_back(nnodes);
-	nnodes++;
+    if(vs[0] == ".r") {
+      try {
+	nregs = stoi(vs[1]);
+      } catch(...) {
+	show_error(".r must be followed by integer");
       }
-    } else if(vs[0] == ".o") {
-      for(int i = 1; i < vs.size(); i++) {
-	node_name2id[vs[i]] = nnodes;
-	o_nodes.push_back(nnodes);
-	nnodes++;
+    }
+    if(vs[0] == ".op") {
+      try {
+	nops = stoi(vs[1]);
+      } catch(...) {
+	show_error(".op must be followed by integer");
       }
-    } else if(vs[0] == ".pe") {
-      for(int i = 1; i < vs.size(); i++) {
-	node_name2id[vs[i]] = nnodes;
-	pe_nodes.push_back(nnodes);
-	nnodes++;
+      map<string, opnode *> name2opnode;
+      for(int i = 0; i < nops; i++) {
+	char c = 'a' + i;
+	string name{c};
+	opnode * p = new opnode;
+	p->type = 0;
+	p->id = i;
+	name2opnode[name] = p;
       }
-    } else {
-      if(cons.size() < nnodes) {
-	cons.resize(nnodes);
-      }
-      int id0 = node_name2id[vs[0]];
-      if(!id0) {
-	show_error("node " + vs[0] + " unspecified");
-      }
-      for(int i = 1; i < vs.size(); i++) {
-	int idi = node_name2id[vs[i]];
-	if(!idi) {
-	  show_error("node " + vs[i] + " unspecified");
+      while(getline(efile, str)) {
+	vs.clear();
+	stringstream ss(str);
+	while(getline(ss, s, ' ')) {
+	  vs.push_back(s);
 	}
-	cons[id0].insert(idi);
+	if(vs.empty()) {
+	  continue;
+	}
+	if(vs[0][0] == '.') {
+	  break;
+	}
+	int pos = 0;
+	opnode * p = create_opnode(vs, pos, name2opnode);
+	operators.push_back(p);
+      }
+    }
+    if(vs[0] == ".pe") {
+      for(int i = 1; i < vs.size(); i++) {
+	node_name2id[vs[i]] = nnodes;
+	nnodes++;
+      }
+    }
+    if(vs[0] == ".com") {
+      while(getline(efile, str)) {
+	vs.clear();
+	stringstream ss(str);
+	while(getline(ss, s, ' ')) {
+	  vs.push_back(s);
+	}
+	if(vs.empty()) {
+	  continue;
+	}
+	if(vs[0][0] == '.') {
+	  show_error(".com should be the last information");
+	}
+	int id0 = node_name2id[vs[0]];
+	int id1 = node_name2id[vs[1]];
+	coms.push_back(make_pair(id0, id1));
       }
     }
   }
@@ -189,31 +225,11 @@ int main(int argc, char** argv) {
     for(auto i : node_name2id) {
       cout << i.first << " -> " << i.second << endl;;
     }
-    cout << "inputs :" << endl;
-    for(int i : i_nodes) {
-      cout << i << ",";
-    }
-    cout << endl;
-    cout << "outputs :" << endl;
-    for(int i : o_nodes) {
-      cout << i << ",";
-    }
-    cout << endl;
-    cout << "PEs :" << endl;
-    for(int i : pe_nodes) {
-    cout << i << ",";
-    }
-    cout << endl;
-    cout << "connections :" << endl;
-    for(int i = 1; i < nnodes; i++) {
-      cout << i << " <- ";
-      for(int j : cons[i]) {
-	cout << j << ",";
-      }
-      cout << endl;
+    cout << "coms :" << endl;
+    for(auto com : coms) {
+      cout << com.first << " -> " << com.second << endl;;
     }
   }
-
   // read formula file
   ifstream ffile(ffilename);
   if(!ffile) {
@@ -269,6 +285,60 @@ int main(int argc, char** argv) {
     }
   }
 
+  extern void gen_spec(string specfilename, vector<string> &inputnames, vector<string> &outputnames, vector<opnode *> &outputs);
+  
+  gen_spec(specfilename, datanames, outputnames, outputs);
+
+  extern int gen_tmpl(string tmplfilename, int ncycles, int nregs, int nnodes, int nops, vector<opnode *> &operators, vector<pair<int, int> > &coms, vector<string> &inputnames, vector<string> &outputnames, map<string, vector<pair<int, string> > > &mcand);
+  int ncycles = 3;
+  map<string, vector<pair<int, string> > > mcand;
+  int nsels = gen_tmpl(tmplfilename, ncycles, nregs, nnodes, nops, operators, coms, datanames, outputnames, mcand);
+
+  extern void gen_top(string topfilename, string specfilename, string tmplfilename, int nsels, vector<string> &inputnames, vector<string> &outputnames, map<string, vector<pair<int, string> > > &mcand);
+  gen_top(topfilename, specfilename, tmplfilename, nsels, datanames, outputnames, mcand);
+
+  string cmd = "abc -c \"read " + topfilename + "; strash; qbf -v -P " + to_string(nsels) + "\" > " + logfilename;
+  system(cmd.c_str());
+
+  vector<int> result;
+  ifstream lfile(logfilename);
+  if(!lfile) {
+    show_error("cannot open log file");
+  }
+  while(getline(lfile, str)) {
+    string s;
+    stringstream ss(str);
+    vector<string> vs;
+    while(getline(ss, s, ' ')) {
+      vs.push_back(s);
+    }
+    if(vs.empty()) {
+      continue;
+    }
+    if(vs[0] == "Parameters:") {
+      for(int i = 0; i < vs[1].size(); i++) {
+	char c = vs[1][i];
+	if(c == '0') {
+	  result.push_back(0);
+	}
+	else if(c == '1') {
+	  result.push_back(1);
+	}
+	else {
+	  show_error("wrong format result");
+	}
+      }
+    }
+  }
+
+  if(result.empty()) {
+    return 0;
+  }
+  extern void show_result(int ncycles, int nnodes, int nregs, vector<pair<int, int> > &coms, vector<int> &result, map<string, vector<pair<int, string> > > &mcand, vector<string> &outputnames);
+  cout << "### result ###" << endl;
+  show_result(ncycles, nnodes, nregs, coms, result, mcand, outputnames);
+  
+  /*
   // apply compression
   if(fcompress) {
     for(auto p : outputs) {
@@ -554,6 +624,6 @@ int main(int argc, char** argv) {
   lfile.close();
   
   cout << "pngs are dumped at " << ofilename << endl;
-  
+  */
   return 0;
 }
