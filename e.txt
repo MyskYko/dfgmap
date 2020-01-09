@@ -3,7 +3,7 @@
 + a b
 * a b
 + c * a b
-.pe n0 n1
+.pe n1 n2
 .com
-n0 n1
-n1 n0
+n1 n2
+n2 n1

@@ -3,7 +3,10 @@
 #include <cassert>
 
 #include "op.hpp"
+#include "blif.hpp"
 using namespace std;
+
+Blif::Blif(vector<string> inputnames, vector<string> outputnames) : inputnames(inputnames), outputnames(outputnames) {}
 
 void write_add(ofstream &f) {
   f << "00 0" << endl;
@@ -41,7 +44,7 @@ string write_opnode(ofstream &f, opnode *p, int &id, vector<string> &inputnames)
   return name;
 }
 
-void gen_spec(string specfilename, vector<string> &inputnames, vector<string> &outputnames, vector<opnode *> &outputs) {
+void Blif::gen_spec(string specfilename, vector<opnode *> &outputs) {
   ofstream f(specfilename);
   if(!f) {
     show_error("cannot open spec file");
@@ -68,7 +71,14 @@ void gen_spec(string specfilename, vector<string> &inputnames, vector<string> &o
   return;
 }
 
-int gen_tmpl(string tmplfilename, int ncycles, int nregs, int nnodes, int nops, vector<opnode *> &operators, vector<pair<int, int> > &coms, vector<string> &inputnames, vector<string> &outputnames, map<string, vector<pair<int, string> > > &mcand) {
+void Blif::gen_tmpl(string tmplfilename, int ncycles, int nregs, int nnodes, int nops, vector<opnode *> &operators, vector<pair<int, int> > &coms) {
+  mcand.clear();
+  nsels = 0;
+  ncycles_ = ncycles;
+  nregs_ = nregs;
+  nnodes_ = nnodes;
+  coms_ = coms;
+  
   ofstream f(tmplfilename);
   if(!f) {
     show_error("cannot open tmpl file");
@@ -90,8 +100,7 @@ int gen_tmpl(string tmplfilename, int ncycles, int nregs, int nnodes, int nops, 
     auto com = coms[i];
     recv[com.second].push_back(i);
   }
-  
-  int nsels = 0;
+
   int maxsel = 0;
   for(int t = 0; t < ncycles; t++) {
     for(int n = 0; n < nnodes; n++) {
@@ -302,10 +311,9 @@ int gen_tmpl(string tmplfilename, int ncycles, int nregs, int nnodes, int nops, 
     f << "1 1" << endl;
     f << ".end" << endl;
   }
-  return nsels;
 }
 
-void gen_top(string topfilename, string specfilename, string tmplfilename, int nsels, vector<string> &inputnames, vector<string> &outputnames, map<string, vector<pair<int, string> > > &mcand) {
+void Blif::gen_top(string topfilename, string specfilename, string tmplfilename) {
   ofstream f(topfilename);
   if(!f) {
     show_error("cannot open top file");    
@@ -429,10 +437,10 @@ void gen_top(string topfilename, string specfilename, string tmplfilename, int n
   system(cmd.c_str());
 }
 
-void show_result(int ncycles, int nnodes, int nregs, vector<pair<int, int> > &coms, vector<int> &result, map<string, vector<pair<int, string> > > &mcand, vector<string> &outputnames) {
-  for(int t = 0; t < ncycles; t++) {
-    for(int n = 0; n < nnodes; n++) {
-      for(int r = 0; r < nregs; r++) {
+void Blif::show_result(vector<int> &result) {
+  for(int t = 0; t < ncycles_; t++) {
+    for(int n = 0; n < nnodes_; n++) {
+      for(int r = 0; r < nregs_; r++) {
 	string name = "reg_t" + to_string(t) + "n" + to_string(n) + "r" + to_string(r);
 	cout << name << " = ";
 	for(auto cand : mcand[name]) {
@@ -453,10 +461,10 @@ void show_result(int ncycles, int nnodes, int nregs, vector<pair<int, int> > &co
       }
       cout << endl;
     }
-    if(t == ncycles-1) {
+    if(t == ncycles_-1) {
       break;
     }
-    for(int p = 0; p < coms.size(); p++) {
+    for(int p = 0; p < coms_.size(); p++) {
       string name = "com_t" + to_string(t) + "p" + to_string(p);    
       cout << name << " = ";
       for(auto cand : mcand[name]) {
