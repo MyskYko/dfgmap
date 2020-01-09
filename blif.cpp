@@ -1,12 +1,13 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <cassert>
 
 #include "op.hpp"
 #include "blif.hpp"
 using namespace std;
 
-Blif::Blif(vector<string> inputnames, vector<string> outputnames) : inputnames(inputnames), outputnames(outputnames) {}
+Blif::Blif(vector<string> inputnames, vector<string> outputnames, map<string, int> nodename2id) : inputnames(inputnames), outputnames(outputnames), nodename2id(nodename2id) {}
 
 void write_add(ofstream &f) {
   f << "00 0" << endl;
@@ -45,6 +46,7 @@ string write_opnode(ofstream &f, opnode *p, int &id, vector<string> &inputnames)
 }
 
 void Blif::gen_spec(string specfilename, vector<opnode *> &outputs) {
+  specfilename_ = specfilename;
   ofstream f(specfilename);
   if(!f) {
     show_error("cannot open spec file");
@@ -72,6 +74,7 @@ void Blif::gen_spec(string specfilename, vector<opnode *> &outputs) {
 }
 
 void Blif::gen_tmpl(string tmplfilename, int ncycles, int nregs, int nnodes, int nops, vector<opnode *> &operators, vector<pair<int, int> > &coms) {
+  tmplfilename_ = tmplfilename;
   mcand.clear();
   nsels = 0;
   ncycles_ = ncycles;
@@ -313,7 +316,114 @@ void Blif::gen_tmpl(string tmplfilename, int ncycles, int nregs, int nnodes, int
   }
 }
 
-void Blif::gen_top(string topfilename, string specfilename, string tmplfilename) {
+void Blif::write_constraints(ofstream &f, string pfilename) {
+  ifstream pfile(pfilename);
+  if(!pfile) {
+    cout << "no parameter file" << endl;
+    return;
+  }
+  int nconstraints = 0;
+  string str;
+  while(getline(pfile, str)) {
+    string s;
+    stringstream ss(str);
+    vector<string> vs;
+    while(getline(ss, s, ' ')) {
+      vs.push_back(s);
+    }
+    if(vs.empty()) {
+      continue;
+    }
+    if(vs[0] == ".assign_inputs") {
+      while(getline(pfile, str)) {
+	vs.clear();
+	stringstream ss(str);
+	while(getline(ss, s, ' ')) {
+	  vs.push_back(s);
+	}
+	if(vs.empty()) {
+	  continue;
+	}
+	if(vs[0][0] == '.') {
+	  break;
+	}
+	int t = 0;
+	set<int> nodes;
+	for(int i = 1; i < vs.size(); i++) {
+	  assert(nodename2id.count(vs[i]));
+	  nodes.insert(nodename2id[vs[i]]);
+	}
+	for(int n = 0; n < nnodes_; n++) {
+	  if(nodes.count(n)) {
+	    continue;
+	  }
+	  for(int r = 0; r < nregs_; r++) {
+	    string name = "reg_t" + to_string(t) + "n" + to_string(n) + "r" + to_string(r);
+	    for(auto cand : mcand[name]) {
+	      if(cand.second == vs[0]) {
+		f << ".names s" << cand.first << " _constraint" << nconstraints++ << endl;
+		f << "0 1" << endl;
+	      }
+	    }
+	  }
+	}
+      }
+    }
+    if(vs[0] == ".assign_outputs") {
+      while(getline(pfile, str)) {
+	vs.clear();
+	stringstream ss(str);
+	while(getline(ss, s, ' ')) {
+	  vs.push_back(s);
+	}
+	if(vs.empty()) {
+	  continue;
+	}
+	if(vs[0][0] == '.') {
+	  break;
+	}
+	set<int> nodes;
+	for(int i = 1; i < vs.size(); i++) {
+	  assert(nodename2id.count(vs[i]));
+	  nodes.insert(nodename2id[vs[i]]);
+	}
+	assert(mcand.count(vs[0]));
+	for(auto cand : mcand[vs[0]]) {
+	  int pos = cand.second.find("n");
+	  s = cand.second.substr(pos+1);
+	  pos = s.find("r");
+	  if(pos != string::npos) {
+	    s = s.substr(0, pos);
+	  }
+	  int n;
+	  try {
+	    n = stoi(s);
+	  } catch(...) {
+	    show_error("unexpected error at option assign_outputs");
+	  }
+	  if(!nodes.count(n)) {
+	    f << ".names s" << cand.first << " _constraint" << nconstraints++ << endl;
+	    f << "0 1" << endl;
+	  }
+	}
+      }      
+    }
+  }
+
+  f << ".names";
+  for(int i = 0; i < nconstraints; i++) {
+    f << " _constraint" << i;
+  }
+  f << " _constraints" << endl;
+  for(int i = 0; i < nconstraints; i++) {
+    f << "1";
+  }
+  f << " 1";
+  f << endl;
+}
+
+void Blif::gen_top(string topfilename, string pfilename) {
+  topfilename_ = topfilename;
   ofstream f(topfilename);
   if(!f) {
     show_error("cannot open top file");    
@@ -402,9 +512,11 @@ void Blif::gen_top(string topfilename, string specfilename, string tmplfilename)
     f << "1";
   }
   f << " 1" << endl;
+  // options
+  write_constraints(f, pfilename);
   // condition
-  f << ".names _eq _amo out" << endl;
-  f << "11 1" << endl;
+  f << ".names _eq _amo _constraints out" << endl;
+  f << "111 1" << endl;
   f << ".end" << endl;
   // amo
   f << ".model amo" << endl;
@@ -433,11 +545,54 @@ void Blif::gen_top(string topfilename, string specfilename, string tmplfilename)
     
   f << ".end" << endl;
   f.close();
-  string cmd = "cat " + specfilename + " " + tmplfilename + " >> " + topfilename;
+  string cmd = "cat " + specfilename_ + " " + tmplfilename_ + " >> " + topfilename;
   system(cmd.c_str());
 }
 
-void Blif::show_result(vector<int> &result) {
+int Blif::synthesize(string logfilename) {
+  result.clear();
+  
+  string cmd = "abc -c \"read " + topfilename_ + "; strash; qbf -v -P " + to_string(nsels) + "\" > " + logfilename;
+  system(cmd.c_str());
+
+  ifstream lfile(logfilename);
+  if(!lfile) {
+    show_error("cannot open log file");
+  }
+  string str;
+  while(getline(lfile, str)) {
+    string s;
+    stringstream ss(str);
+    vector<string> vs;
+    while(getline(ss, s, ' ')) {
+      vs.push_back(s);
+    }
+    if(vs.empty()) {
+      continue;
+    }
+    if(vs[0] == "Parameters:") {
+      for(int i = 0; i < vs[1].size(); i++) {
+	char c = vs[1][i];
+	if(c == '0') {
+	  result.push_back(0);
+	}
+	else if(c == '1') {
+	  result.push_back(1);
+	}
+	else {
+	  show_error("wrong format result");
+	}
+      }
+    }
+  }
+  
+  if(result.empty()) {
+    return 0;
+  }
+  return 1;
+}
+
+void Blif::show_result() {
   for(int t = 0; t < ncycles_; t++) {
     for(int n = 0; n < nnodes_; n++) {
       for(int r = 0; r < nregs_; r++) {

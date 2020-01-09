@@ -1,6 +1,6 @@
-.assign_i
+.assign_inputs
 x1 n1
 x2 n2
-.assign_o
+.assign_outputs
 y1 n1
 y2 n2

@@ -89,7 +89,7 @@ int main(int argc, char** argv) {
   int nregs;
   int nops;
   vector<opnode *> operators;
-  map<string, int> node_name2id;
+  map<string, int> nodename2id;
   int nnodes = 0;
   vector<pair<int, int> > coms;
   string str;
@@ -144,7 +144,7 @@ int main(int argc, char** argv) {
     }
     if(vs[0] == ".pe") {
       for(int i = 1; i < vs.size(); i++) {
-	node_name2id[vs[i]] = nnodes;
+	nodename2id[vs[i]] = nnodes;
 	nnodes++;
       }
     }
@@ -161,8 +161,8 @@ int main(int argc, char** argv) {
 	if(vs[0][0] == '.') {
 	  show_error(".com should be the last information");
 	}
-	int id0 = node_name2id[vs[0]];
-	int id1 = node_name2id[vs[1]];
+	int id0 = nodename2id[vs[0]];
+	int id1 = nodename2id[vs[1]];
 	coms.push_back(make_pair(id0, id1));
       }
     }
@@ -172,7 +172,7 @@ int main(int argc, char** argv) {
   if(nverbose >= 2) {
     cout << "### environment information ###" << endl;
     cout << "node name to id :" << endl;
-    for(auto i : node_name2id) {
+    for(auto i : nodename2id) {
       cout << i.first << " -> " << i.second << endl;;
     }
     cout << "coms :" << endl;
@@ -236,55 +236,24 @@ int main(int argc, char** argv) {
     }
   }
 
-  Blif blif(datanames, outputnames);
+  Blif blif(datanames, outputnames, nodename2id);
+  
   blif.gen_spec(specfilename, outputs);
 
   blif.gen_tmpl(tmplfilename, ncycles, nregs, nnodes, nops, operators, coms);
 
-  blif.gen_top(topfilename, specfilename, tmplfilename);
+  blif.gen_top(topfilename, pfilename);
 
-  string cmd = "abc -c \"read " + topfilename + "; strash; qbf -v -P " + to_string(blif.nsels) + "\" > " + logfilename;
-  system(cmd.c_str());
+  int r = blif.synthesize(logfilename);
 
-  vector<int> result;
-  ifstream lfile(logfilename);
-  if(!lfile) {
-    show_error("cannot open log file");
-  }
-  while(getline(lfile, str)) {
-    string s;
-    stringstream ss(str);
-    vector<string> vs;
-    while(getline(ss, s, ' ')) {
-      vs.push_back(s);
-    }
-    if(vs.empty()) {
-      continue;
-    }
-    if(vs[0] == "Parameters:") {
-      for(int i = 0; i < vs[1].size(); i++) {
-	char c = vs[1][i];
-	if(c == '0') {
-	  result.push_back(0);
-	}
-	else if(c == '1') {
-	  result.push_back(1);
-	}
-	else {
-	  show_error("wrong format result");
-	}
-      }
-    }
-  }
-
-  if(result.empty()) {
+  if(!r) {
     cout << "UNSAT" << endl;
     return 0;
   }
   
   if(nverbose) {
     cout << "### result ###" << endl;
-    blif.show_result(result);
+    blif.show_result();
   }
   
   return 0;
