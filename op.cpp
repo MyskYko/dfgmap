@@ -208,3 +208,17 @@ void gen_operands(opnode *p, int &ndata, vector<set<set<int> > > &operands, map<
   }
   p->id = unique[key];
 }
+
+string gen_opstr(opnode *p, vector<string> &datanames) {
+  if(p->id < datanames.size()) {
+    return datanames[p->id];
+  }
+  assert(p->vc.size() == 2);
+  string str;
+  str = gen_opstr(p->vc[0], datanames);
+  str += " ";
+  str += typeop(p->type);
+  str += " ";  
+  str += gen_opstr(p->vc[1], datanames);
+  return str;
+}

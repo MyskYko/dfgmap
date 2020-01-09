@@ -15,6 +15,9 @@ public:
   void gen_top(std::string topfilename, std::string pfilename);
   int synthesize(std::string logfilename);
   void show_result();
+  void gen_image();
+
+  std::vector<std::vector<std::vector<std::string> > > image;
   
 private:
   std::vector<std::string> inputnames;
@@ -27,6 +30,8 @@ private:
   int ncycles_;
   int nnodes_;
   int nregs_;
+  int nops_;
+  std::vector<opnode *> operators_;
   std::vector<std::pair<int, int> > coms_;
   
   int nsels;

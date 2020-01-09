@@ -80,6 +80,8 @@ void Blif::gen_tmpl(string tmplfilename, int ncycles, int nregs, int nnodes, int
   ncycles_ = ncycles;
   nregs_ = nregs;
   nnodes_ = nnodes;
+  nops_ = nops;
+  operators_ = operators;
   coms_ = coms;
   
   ofstream f(tmplfilename);
@@ -217,12 +219,14 @@ void Blif::gen_tmpl(string tmplfilename, int ncycles, int nregs, int nnodes, int
 	i++;
 	nsels++;
       }
+      /*
       s = "ope_t" + to_string(t) + "n" + to_string(n);
       f << " i" << i << "=" << s;
       f << " j" << i << "=s" << nsels;
       vcand.push_back(make_pair(nsels, s));
       i++;
       nsels++;
+      */
       mcand[name] = vcand;
       f << endl;
       if(i > maxsel) {
@@ -640,5 +644,88 @@ void Blif::show_result() {
       }
     }
     cout << endl;
+  }
+}
+
+void Blif::gen_image() {
+  image.resize(ncycles_);
+  for(int t = 0; t < ncycles_; t++) {
+    image[t].resize(nnodes_ + coms_.size());
+    for(int n = 0; n < nnodes_; n++) {
+      image[t][n].resize(nregs_+1);
+    }
+    for(int n = nnodes_; n < nnodes_+coms_.size(); n++) {
+      image[t][n].resize(1);
+    }
+  }
+  
+  map<string, string> pos2data;
+  
+  for(int t = 0; t < ncycles_; t++) {
+    for(int n = 0; n < nnodes_; n++) {
+      for(int r = 0; r < nregs_; r++) {
+	string name = "reg_t" + to_string(t) + "n" + to_string(n) + "r" + to_string(r);
+	for(auto cand : mcand[name]) {
+	  if(result[cand.first]) {
+	    string s = cand.second;
+	    if(!pos2data[s].empty()) {
+	      s = pos2data[s];
+	    }
+	    pos2data[name] = s;
+	    break;
+	  }
+	}
+	if(!pos2data.count(name)) {
+	  pos2data[name] = "0";
+	}
+	image[t][n][r] = pos2data[name];
+      }
+      string name = "ope_t" + to_string(t) + "n" + to_string(n);      
+      for(auto cand : mcand[name]) {
+	if(result[cand.first]) {
+	  int pos = cand.second.rfind("o");
+	  string str = cand.second.substr(pos+1);
+	  int o;
+	  try {
+	    o = stoi(str);
+	  } catch(...) {
+	    show_error("unexpected error at operator in result");
+	  }
+	  vector<string> opnames;
+	  for(int i = 0; i < nops_; i++) {
+	    string s = "reg_t" + to_string(t) + "n" + to_string(n) + "r" + to_string(i);
+	    s = pos2data[s];
+	    opnames.push_back(s);
+	  }
+	  string s = gen_opstr(operators_[o], opnames);
+	  pos2data[name] = s;
+	  break;
+	}
+      }
+      if(!pos2data.count(name)) {
+	pos2data[name] = "0";
+      }
+      image[t][n][nregs_] = pos2data[name];
+    }
+    if(t == ncycles_-1) {
+      break;
+    }
+    for(int p = 0; p < coms_.size(); p++) {
+      string name = "com_t" + to_string(t) + "p" + to_string(p);    
+      for(auto cand : mcand[name]) {
+	if(result[cand.first]) {
+	  string s = cand.second;
+	  if(!pos2data[s].empty()) {
+	    s = pos2data[s];
+	  }
+	  pos2data[name] = s;
+	  break;
+	}
+      }
+      if(!pos2data.count(name)) {
+	pos2data[name] = "0";
+      }
+      image[t][nnodes_+p][0] = pos2data[name];
+    }
   }
 }

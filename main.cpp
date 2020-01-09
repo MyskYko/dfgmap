@@ -19,10 +19,10 @@ int main(int argc, char** argv) {
   string tmplfilename = "_tmpl.blif";
   string topfilename = "_top.blif";
   string logfilename = "_log.txt";
+  string dotfilename = "_dot";
 
   int ncycles = 0;
   int nverbose = 0;
-
   // read options
   for(int i = 1; i < argc; i++) {
     if(argv[i][0] == '-') {
@@ -254,6 +254,35 @@ int main(int argc, char** argv) {
   if(nverbose) {
     cout << "### result ###" << endl;
     blif.show_result();
+  }
+
+  blif.gen_image();
+
+  for(int t = 0; t < ncycles; t++) {
+    ofstream dfile(dotfilename + to_string(t));
+    dfile << "digraph test {" << endl;
+    dfile << "graph [ sep = 1 ];" << endl;
+    dfile << "node [ shape = record ];" << endl;
+    dfile << "edge [ color = blue ];" << endl; //, labeldistance = 10, labelangle = 5
+    for(auto node : nodename2id) {
+      dfile << "subgraph cluster_" << node.second << " {" << endl;
+      dfile << "label = \"" + node.first + "\";" << endl;;
+      dfile << node.first << " [ label = \"{{";
+      dfile << blif.image[t][node.second][0];
+      for(int r = 1; r < nregs; r++) {
+	dfile << "|" << blif.image[t][node.second][r];
+      }
+      dfile << "}|" << blif.image[t][node.second][nregs] << "}\" ]" << endl;;
+      dfile << "};" << endl;;
+    }
+    for(int p = 0; p < coms.size(); p++) {
+      dfile << "cluster_" << coms[p].first << " -> cluster_" << coms[p].second << "[ label = \""; // taillabel?
+      dfile << blif.image[t][nnodes+p][0] << "\" ]" << endl;
+    }
+    dfile << "}" << endl;
+    dfile.close();
+    string cmd = "fdp -T pdf " + dotfilename + to_string(t) + " -o _cycle" + to_string(t+1) + ".pdf";
+    system(cmd.c_str());
   }
   
   return 0;

@@ -21,4 +21,6 @@ void print_opnode(opnode * p, int depth);
 void compress_opnode(opnode * p);
 void gen_operands(opnode * p, int &ndata, std::vector<std::set<std::set<int> > > &operands, std::map<std::pair<int, std::multiset<int> >, int> &unique, std::vector<std::string> &datanames, int fmac);
 
+std::string gen_opstr(opnode *p, std::vector<std::string> &datanames);
+  
 #endif // OP_HPP
