@@ -648,6 +648,43 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	}
       }
     }
+    if(vs[0] == ".fixop") {
+      for(int t = 0; t < ncycles_; t++) {
+	for(int n = 0; n < nnodes_; n++) {
+	  string name = "ope_t" + to_string(t) + "n" + to_string(n);
+	  assert(mcand[name].size() == 1);
+	  for(auto cand : mcand[name]) {
+	    f << ".names s" << cand.first << endl;
+	    f << "1" << endl;
+	    fsels[cand.first] = 1;
+	    nconstraints++;
+	  }
+	}
+      }
+    }
+    if(vs[0] == ".symmetric") {
+      for(int t = 1; t < ncycles_; t++) {
+	for(int n = 1; n < nnodes_; n++) {
+	  for(int r = 0; r < nregs_; r++) {
+	    string name0 = "reg_t" + to_string(t) + "n" + to_string(0) + "r" + to_string(r);
+	    string name = "reg_t" + to_string(t) + "n" + to_string(n) + "r" + to_string(r);
+	    assert(mcand[name0].size() == mcand[name].size());
+	    for(int i = 0; i < mcand[name0].size(); i++) {
+	      auto cand0 = mcand[name0][i];
+	      auto cand = mcand[name][i];
+	      assert(fsels[cand0.first] == fsels[cand.first]);
+	      if(fsels[cand0.first]) {
+		continue;
+	      }
+	      f << ".names s" << cand0.first << " s" << cand.first << endl;
+	      f << "1 1" << endl;
+	      fsels[cand.first] = 1;
+	      nconstraints++;
+	    }
+	  }
+	}
+      }
+    }
   }
 
   nsels_ = nsels - nconstraints;
