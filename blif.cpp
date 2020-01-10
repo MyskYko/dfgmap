@@ -352,16 +352,41 @@ void Blif::write_constraints(ofstream &f, string pfilename) {
 	  break;
 	}
 	int t = 0;
-	set<int> nodes;
+	vector<vector<int> > fcand;
+	fcand.resize(nnodes_);
+	for(int n = 0; n < nnodes_; n++) {
+	  fcand[n].resize(nregs_);
+	}
 	for(int i = 1; i < vs.size(); i++) {
 	  assert(nodename2id.count(vs[i]));
-	  nodes.insert(nodename2id[vs[i]]);
+	  string name = vs[i];
+	  if(i+1 < vs.size() && vs[i+1] == "{") {
+	    i += 2;
+	    for(;i < vs.size(); i++) {
+	      if(vs[i] == "}") {
+		break;
+	      }
+	      int r;
+	      try {
+		r = stoi(vs[i]) - 1;
+	      } catch(...) {
+		show_error("unexpected error at option assign_inputs");
+	      }
+	      assert(r >= 0 && r < nregs_);
+	      fcand[nodename2id[name]][r] = 1;
+	    }
+	  }
+	  else {
+	    for(int r = 0; r < nregs_; r++) {
+	      fcand[nodename2id[name]][r] = 1;
+	    }
+	  }
 	}
 	for(int n = 0; n < nnodes_; n++) {
-	  if(nodes.count(n)) {
-	    continue;
-	  }
 	  for(int r = 0; r < nregs_; r++) {
+	    if(fcand[n][r]) {
+	      continue;
+	    }
 	    string name = "reg_t" + to_string(t) + "n" + to_string(n) + "r" + to_string(r);
 	    for(auto cand : mcand[name]) {
 	      if(cand.second == vs[0]) {
@@ -386,17 +411,47 @@ void Blif::write_constraints(ofstream &f, string pfilename) {
 	if(vs[0][0] == '.') {
 	  break;
 	}
-	set<int> nodes;
+	vector<vector<int> > fcand;
+	fcand.resize(nnodes_);
+	for(int n = 0; n < nnodes_; n++) {
+	  fcand[n].resize(nregs_+1);
+	}
 	for(int i = 1; i < vs.size(); i++) {
 	  assert(nodename2id.count(vs[i]));
-	  nodes.insert(nodename2id[vs[i]]);
+	  string name = vs[i];
+	  if(i+1 < vs.size() && vs[i+1] == "{") {
+	    i += 2;
+	    for(;i < vs.size(); i++) {
+	      if(vs[i] == "}") {
+		break;
+	      }
+	      int r;
+	      try {
+		r = stoi(vs[i]) - 1;
+	      } catch(...) {
+		show_error("unexpected error at option assign_inputs");
+	      }
+	      if(r == -1) {
+		r = nregs_;
+	      }
+	      assert(r >= 0 && r <= nregs_);
+	      fcand[nodename2id[name]][r] = 1;
+	    }
+	  }
+	  else {
+	    for(int r = 0; r < nregs_+1; r++) {
+	      fcand[nodename2id[name]][r] = 1;
+	    }
+	  }
 	}
 	assert(mcand.count(vs[0]));
 	for(auto cand : mcand[vs[0]]) {
 	  int pos = cand.second.find("n");
 	  s = cand.second.substr(pos+1);
 	  pos = s.find("r");
+	  string sr;
 	  if(pos != string::npos) {
+	    sr = s.substr(pos+1);
 	    s = s.substr(0, pos);
 	  }
 	  int n;
@@ -405,12 +460,167 @@ void Blif::write_constraints(ofstream &f, string pfilename) {
 	  } catch(...) {
 	    show_error("unexpected error at option assign_outputs");
 	  }
-	  if(!nodes.count(n)) {
+	  if(sr.empty()) {
+	    // ope
+	    if(fcand[n][nregs_]) {
+	      continue;
+	    }
+	    f << ".names s" << cand.first << " _constraint" << nconstraints++ << endl;
+	    f << "0 1" << endl;
+	    continue;
+	  }
+	  // reg
+	  int r;
+	  try {
+	    r = stoi(sr);
+	  } catch(...) {
+	    show_error("unexpected error at option assign_outputs");
+	  }
+	  if(fcand[n][r]) {
+	    continue;
+	  }
+	  f << ".names s" << cand.first << " _constraint" << nconstraints++ << endl;
+	  f << "0 1" << endl;
+	}
+      }      
+    }
+    if(vs[0] == ".assign_regs") {
+      while(getline(pfile, str)) {
+	vs.clear();
+	stringstream ss(str);
+	while(getline(ss, s, ' ')) {
+	  vs.push_back(s);
+	}
+	if(vs.empty()) {
+	  continue;
+	}
+	if(vs[0][0] == '.') {
+	  break;
+	}
+	vector<int> fcand;
+	fcand.resize(nregs_+2);
+	for(int i = 1; i < vs.size(); i++) {
+	  int r;
+	  try {
+	    r = stoi(vs[i])-1;
+	  } catch(...) {
+	    show_error("unexpected error at option assign_regs");
+	  }
+	  if(r == -1) {
+	    r = nregs_;
+	  }
+	  if(r == -2) {
+	    r = nregs_+1;
+	  }
+	  assert(r >= 0 && r <= nregs_+1);
+	  fcand[r] = 1;
+	}
+	int r1;
+	try {
+	  r1 = stoi(vs[0])-1;
+	} catch(...) {
+	  show_error("unexpected error at option assign_regs");
+	}
+	assert(r1 >= 0 && r1 < nregs_);
+	for(int t = 1; t < ncycles_; t++) {
+	  for(int n = 0; n < nnodes_; n++) {
+	    string name = "reg_t" + to_string(t) + "n" + to_string(n) + "r" + to_string(r1);
+	    for(auto cand : mcand[name]) {
+	      if(cand.second.find("ope") != string::npos) {
+		// ope
+		if(fcand[nregs_]) {
+		  continue;
+		}
+		f << ".names s" << cand.first << " _constraint" << nconstraints++ << endl;
+		f << "0 1" << endl;
+		continue;
+	      }
+	      if(cand.second.find("com") != string::npos) {
+		// com
+		if(fcand[nregs_+1]) {
+		  continue;
+		}
+		f << ".names s" << cand.first << " _constraint" << nconstraints++ << endl;
+		f << "0 1" << endl;
+		continue;
+	      }
+	      // reg
+	      int pos = cand.second.find("n");
+	      s = cand.second.substr(pos+1);
+	      pos = s.find("r");
+	      s = s.substr(pos+1);
+	      int r2;
+	      try {
+		r2 = stoi(s);
+	      } catch(...) {
+		show_error("unexpected error at option assign_regs");
+	      }
+	      if(fcand[r2]) {
+		continue;
+	      }
+	      f << ".names s" << cand.first << " _constraint" << nconstraints++ << endl;
+	      f << "0 1" << endl;
+	    }
+	  }
+	}
+      }
+    }
+    if(vs[0] == ".assign_coms") {
+      while(getline(pfile, str)) {
+	vs.clear();
+	stringstream ss(str);
+	while(getline(ss, s, ' ')) {
+	  vs.push_back(s);
+	}
+	if(vs.empty()) {
+	  continue;
+	}
+	if(vs[0][0] == '.') {
+	  break;
+	}
+	vector<int> fcand;
+	fcand.resize(nregs_+1);
+	for(int i = 1; i < vs.size(); i++) {
+	  int r;
+	  try {
+	    r = stoi(vs[i])-1;
+	  } catch(...) {
+	    show_error("unexpected error at option assign_coms");
+	  }
+	  if(r == -1) {
+	    r = nregs_;
+	  }
+	  assert(r >= 0 && r <= nregs_);
+	  fcand[r] = 1;
+	}
+	int p;
+	try {
+	  p = stoi(vs[0])-1;
+	} catch(...) {
+	  show_error("unexpected error at option assign_coms");
+	}
+	assert(p >= 0 && p < coms_.size());
+	for(int t = 0; t < ncycles_-1; t++) {
+	  string name = "com_t" + to_string(t) + "p" + to_string(p);
+	  for(auto cand : mcand[name]) {
+	    int pos = cand.second.find("n");
+	    s = cand.second.substr(pos+1);
+	    pos = s.find("r");
+	    s = s.substr(pos+1);
+	    int r;
+	    try {
+	      r = stoi(s);
+	    } catch(...) {
+	      show_error("unexpected error at option assign_coms");
+	    }
+	    if(fcand[r]) {
+	      continue;
+	    }
 	    f << ".names s" << cand.first << " _constraint" << nconstraints++ << endl;
 	    f << "0 1" << endl;
 	  }
 	}
-      }      
+      }
     }
   }
 

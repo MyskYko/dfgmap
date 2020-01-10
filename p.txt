@@ -1,6 +1,6 @@
 .assign_inputs
-x1 n1
-x2 n2
+x1 n1 { 1 }
+x2 n2 { 1 }
 .assign_outputs
-y1 n1
-y2 n2
+y1 n1 { 0 }
+y2 n2 { 0 }
