@@ -320,7 +320,7 @@ void Blif::gen_tmpl(string tmplfilename, int ncycles, int nregs, int nnodes, int
   }
 }
 
-void Blif::write_constraints(ofstream &f, string pfilename) {
+void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &maxcand) {
   ifstream pfile(pfilename);
   if(!pfile) {
     cout << "no parameter file" << endl;
@@ -390,8 +390,8 @@ void Blif::write_constraints(ofstream &f, string pfilename) {
 	    string name = "reg_t" + to_string(t) + "n" + to_string(n) + "r" + to_string(r);
 	    for(auto cand : mcand[name]) {
 	      if(cand.second == vs[0]) {
-		f << ".names s" << cand.first << " _constraint" << nconstraints++ << endl;
-		f << "0 1" << endl;
+		fsels[cand.first] = 1;
+		nconstraints++;
 	      }
 	    }
 	  }
@@ -465,8 +465,8 @@ void Blif::write_constraints(ofstream &f, string pfilename) {
 	    if(fcand[n][nregs_]) {
 	      continue;
 	    }
-	    f << ".names s" << cand.first << " _constraint" << nconstraints++ << endl;
-	    f << "0 1" << endl;
+	    fsels[cand.first] = 1;
+	    nconstraints++;
 	    continue;
 	  }
 	  // reg
@@ -479,8 +479,8 @@ void Blif::write_constraints(ofstream &f, string pfilename) {
 	  if(fcand[n][r]) {
 	    continue;
 	  }
-	  f << ".names s" << cand.first << " _constraint" << nconstraints++ << endl;
-	  f << "0 1" << endl;
+	  fsels[cand.first] = 1;
+	  nconstraints++;
 	}
       }      
     }
@@ -531,8 +531,8 @@ void Blif::write_constraints(ofstream &f, string pfilename) {
 		if(fcand[nregs_]) {
 		  continue;
 		}
-		f << ".names s" << cand.first << " _constraint" << nconstraints++ << endl;
-		f << "0 1" << endl;
+		fsels[cand.first] = 1;
+		nconstraints++;
 		continue;
 	      }
 	      if(cand.second.find("com") != string::npos) {
@@ -540,8 +540,8 @@ void Blif::write_constraints(ofstream &f, string pfilename) {
 		if(fcand[nregs_+1]) {
 		  continue;
 		}
-		f << ".names s" << cand.first << " _constraint" << nconstraints++ << endl;
-		f << "0 1" << endl;
+		fsels[cand.first] = 1;
+		nconstraints++;
 		continue;
 	      }
 	      // reg
@@ -558,8 +558,8 @@ void Blif::write_constraints(ofstream &f, string pfilename) {
 	      if(fcand[r2]) {
 		continue;
 	      }
-	      f << ".names s" << cand.first << " _constraint" << nconstraints++ << endl;
-	      f << "0 1" << endl;
+	      fsels[cand.first] = 1;
+	      nconstraints++;
 	    }
 	  }
 	}
@@ -616,24 +616,48 @@ void Blif::write_constraints(ofstream &f, string pfilename) {
 	    if(fcand[r]) {
 	      continue;
 	    }
-	    f << ".names s" << cand.first << " _constraint" << nconstraints++ << endl;
-	    f << "0 1" << endl;
+	    fsels[cand.first] = 1;
+	    nconstraints++;
 	  }
+	}
+      }
+    }
+    if(vs[0] == ".amo") {
+      for(int i = 1; i < vs.size(); i++) {
+	vector<int> scand;
+	int t = 0;
+	for(int n = 0; n < nnodes_; n++) {
+	  for(int r = 0; r < nregs_; r++) {
+	    string name = "reg_t" + to_string(t) + "n" + to_string(n) + "r" + to_string(r);
+	    for(auto cand : mcand[name]) {
+	      if(cand.second == vs[i]) {
+		scand.push_back(cand.first);
+	      }
+	    }
+	  }
+	}
+	f << ".subckt amo";
+	int j = 0;
+	for(auto cand : scand) {
+	  f << " i" << j++ << "=s" << cand;
+	}
+	f << " out=_amo" << namos++;
+	f << endl;
+	if(maxcand < j) {
+	  maxcand = j;
 	}
       }
     }
   }
 
-  f << ".names";
-  for(int i = 0; i < nconstraints; i++) {
-    f << " _constraint" << i;
+  nsels_ = nsels - nconstraints;
+  int count = 0;
+  for(int i = 0; i < nsels; i++) {
+    if(fsels[i]) {
+      count++;
+    }
   }
-  f << " _constraints" << endl;
-  for(int i = 0; i < nconstraints; i++) {
-    f << "1";
-  }
-  f << " 1";
-  f << endl;
+  assert(count == nconstraints);
 }
 
 void Blif::gen_top(string topfilename, string pfilename) {
@@ -643,14 +667,6 @@ void Blif::gen_top(string topfilename, string pfilename) {
     show_error("cannot open top file");    
   }
   f << ".model top" << endl;
-  f << ".inputs";
-  for(int i = 0; i < nsels; i++) {
-    f << " s" << i;
-  }
-  for(auto name : inputnames) {
-    f << " " << name;
-  }
-  f << endl;
   f << ".outputs out" << endl;
   // spec
   f << ".subckt spec";
@@ -716,7 +732,23 @@ void Blif::gen_top(string topfilename, string pfilename) {
       maxcand = i;
     }
   }
-  f << ".names";
+  // options
+  fsels.clear();
+  fsels.resize(nsels);
+  write_constraints(f, pfilename, namos, maxcand);
+  f << ".inputs";
+  for(int i = 0; i < nsels; i++) {
+    if(fsels[i]) {
+      continue;
+    }
+    f << " s" << i;
+  }
+  for(auto name : inputnames) {
+    f << " " << name;
+  }
+  f << endl;
+  // condition
+    f << ".names";
   for(int i = 0; i < namos; i++) {
     f << " _amo" << i;
   }
@@ -726,11 +758,8 @@ void Blif::gen_top(string topfilename, string pfilename) {
     f << "1";
   }
   f << " 1" << endl;
-  // options
-  write_constraints(f, pfilename);
-  // condition
-  f << ".names _eq _amo _constraints out" << endl;
-  f << "111 1" << endl;
+  f << ".names _eq _amo out" << endl;
+  f << "11 1" << endl;
   f << ".end" << endl;
   // amo
   f << ".model amo" << endl;
@@ -766,7 +795,7 @@ void Blif::gen_top(string topfilename, string pfilename) {
 int Blif::synthesize(string logfilename) {
   result.clear();
   
-  string cmd = "abc -c \"read " + topfilename_ + "; strash; qbf -v -P " + to_string(nsels) + "\" > " + logfilename;
+  string cmd = "abc -c \"read " + topfilename_ + "; strash; qbf -v -P " + to_string(nsels_) + "\" > " + logfilename;
   system(cmd.c_str());
 
   ifstream lfile(logfilename);
@@ -803,6 +832,18 @@ int Blif::synthesize(string logfilename) {
   if(result.empty()) {
     return 0;
   }
+  vector<int> result_;
+  int j = 0;
+  for(int i = 0; i < nsels; i++) {
+    if(fsels[i]) {
+      result_.push_back(0);
+    }
+    else {
+      result_.push_back(result[j++]);
+    }
+  }
+  assert(j == nsels_);
+  result = result_;
   return 1;
 }
 

@@ -37,7 +37,9 @@ private:
   int nsels;
   std::map<std::string, std::vector<std::pair<int, std::string> > > mcand;
 
-  void write_constraints(std::ofstream &f, std::string pfilename);
+  std::vector<int> fsels;
+  int nsels_;
+  void write_constraints(std::ofstream &f, std::string pfilename, int &namos, int &maxcand);
 
   std::vector<int> result;
 };
