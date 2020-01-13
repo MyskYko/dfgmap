@@ -93,11 +93,13 @@ void Blif::gen_tmpl(string tmplfilename, int ncycles, int nregs, int nnodes, int
   nops_ = nops;
   operators_ = operators;
   coms_ = coms;
-  
+  /*
   ofstream f(tmplfilename);
   if(!f) {
     show_error("cannot open tmpl file");
   }
+  */
+  ofstream f(0);
   f << ".model tmpl" << endl;
   f << ".inputs";
   for(auto name : inputnames) {
@@ -753,8 +755,10 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	      if(fsels[cand0.first]) {
 		continue;
 	      }
+	      /*
 	      f << ".names s" << cand0.first << " s" << cand.first << endl;
 	      f << "1 1" << endl;
+	      */
 	      fsels[cand.first] = cand0.first + 1;
 	      nconstraints++;
 	    }
@@ -809,8 +813,10 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 		if(fsels[cand0.first]) {
 		  continue;
 		}
+		/*
 		f << ".names s" << cand0.first << " s" << cand.first << endl;
 		f << "1 1" << endl;
+		*/
 		fsels[cand.first] = cand0.first + 1;
 		nconstraints++;
 	      }
@@ -1030,12 +1036,16 @@ void rewrite_tmpl(string tmplfilename, int ncycles, int nregs, int nnodes, int n
   // add select signals to inputs
   f << ".inputs";
   for(int i = 0; i < nsels; i++) {
-    if(fsels[i] >= 0) {
+    if(!fsels[i]) {
       f << " s" << i;
     }
   }
   f << endl;
   for(int i = 0; i < nsels; i++) {
+    if(fsels[i] > 0) {
+      f << ".names s" << fsels[i]-1 << " s" << i << endl;
+      f << "1 1" << endl;
+    }
     if(fsels[i] == -2) {
       f << ".names s" << i << endl;
       f << "1" << endl;
@@ -1203,7 +1213,7 @@ void Blif::gen_top(string topfilename, string pfilename) {
     f << " " << name << "=" << name;
   }
   for(int i = 0; i < nsels; i++) {
-    if(fsels[i] >= 0) {
+    if(!fsels[i]) {
       f << " s" << i << "=s" << i;
     }
   }
