@@ -403,8 +403,6 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	      if(ncand == 1) {
 		for(auto cand : mcand[name]) {
 		  if(cand.second == vs[0]) {
-		    f << ".names s" << cand.first << endl;
-		    f << "1" << endl;
 		    fsels[cand.first] = -2;
 		    nconstraints++;
 		  }
@@ -454,7 +452,7 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	      try {
 		r = stoi(vs[i]) - 1;
 	      } catch(...) {
-		show_error("unexpected error at option assign_inputs");
+		show_error("unexpected error at option assign_outputs");
 	      }
 	      if(r == -1) {
 		r = nregs_;
@@ -491,8 +489,6 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	    // ope
 	    if(fcand[n][nregs_]) {
 	      if(ncand == 1) {
-		f << ".names s" << cand.first << endl;
-		f << "1" << endl;
 		fsels[cand.first] = -2;
 		nconstraints++;
 	      }
@@ -511,8 +507,6 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	  }
 	  if(fcand[n][r]) {
 	    if(ncand == 1) {
-	      f << ".names s" << cand.first << endl;
-	      f << "1" << endl;
 	      fsels[cand.first] = -2;
 	      nconstraints++;
 	    }
@@ -571,8 +565,6 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 		// ope
 		if(fcand[nregs_]) {
 		  if(ncand == 1) {
-		    f << ".names s" << cand.first << endl;
-		    f << "1" << endl;
 		    fsels[cand.first] = -2;
 		    nconstraints++;
 		  }
@@ -586,8 +578,6 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 		// com
 		if(fcand[nregs_+1]) {
 		  if(ncand == 1) {
-		    f << ".names s" << cand.first << endl;
-		    f << "1" << endl;
 		    fsels[cand.first] = -2;
 		    nconstraints++;
 		  }
@@ -610,8 +600,6 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	      }
 	      if(fcand[r2]) {
 		if(ncand == 1) {
-		  f << ".names s" << cand.first << endl;
-		  f << "1" << endl;
 		  fsels[cand.first] = -2;
 		  nconstraints++;
 		}
@@ -676,8 +664,6 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	    }
 	    if(fcand[r]) {
 	      if(ncand == 1) {
-		f << ".names s" << cand.first << endl;
-		f << "1" << endl;
 		fsels[cand.first] = -2;
 		nconstraints++;
 	      }
@@ -703,15 +689,41 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	    }
 	  }
 	}
-	f << ".subckt amo";
-	int j = 0;
+	int n1 = 0;
+	int nf = 0;
 	for(auto cand : scand) {
-	  f << " i" << j++ << "=s" << cand;
+	  if(fsels[cand] == -2) {
+	    n1++;
+	  }
+	  if(fsels[cand]) {
+	    nf++;
+	  }
 	}
-	f << " out=_amo" << namos++;
-	f << endl;
-	if(maxcand < j) {
-	  maxcand = j;
+	assert(n1 <= 1);
+	assert(nf <= scand.size());
+	if(nf < scand.size()) {
+	  if(!n1) {
+	    f << ".subckt amo";
+	    int j = 0;
+	    for(auto cand : scand) {
+	      if(!fsels[cand]) {
+		f << " i" << j++ << "=s" << cand;
+	      }
+	    }
+	    f << " out=_amo" << namos++;
+	    f << endl;
+	    if(maxcand < j) {
+	      maxcand = j;
+	    }
+	  }
+	  else {
+	    for(auto cand : scand) {
+	      if(!fsels[cand]) {
+		fsels[cand] = -1;
+		nconstraints++;
+	      }
+	    }
+	  }
 	}
       }
     }
@@ -721,8 +733,6 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	  string name = "ope_t" + to_string(t) + "n" + to_string(n);
 	  assert(mcand[name].size() == 1);
 	  for(auto cand : mcand[name]) {
-	    f << ".names s" << cand.first << endl;
-	    f << "1" << endl;
 	    fsels[cand.first] = -2;
 	    nconstraints++;
 	  }
@@ -1020,11 +1030,17 @@ void rewrite_tmpl(string tmplfilename, int ncycles, int nregs, int nnodes, int n
   // add select signals to inputs
   f << ".inputs";
   for(int i = 0; i < nsels; i++) {
-    if(fsels[nsels] >= 0 || fsels[nsels] == -2) {
+    if(fsels[i] >= 0) {
       f << " s" << i;
     }
   }
   f << endl;
+  for(int i = 0; i < nsels; i++) {
+    if(fsels[i] == -2) {
+      f << ".names s" << i << endl;
+      f << "1" << endl;
+    }
+  }
   f << ".end" << endl;
   // mux
   f << ".model mux" << endl;
@@ -1096,18 +1112,6 @@ void Blif::gen_top(string topfilename, string pfilename) {
     f << " " << name << "=_spec_" << name;
   }
   f << endl;
-  // tmpl
-  f << ".subckt tmpl";
-  for(auto name : inputnames) {
-    f << " " << name << "=" << name;
-  }
-  for(int i = 0; i < nsels; i++) {
-    f << " s" << i << "=s" << i;
-  }
-  for(auto name : outputnames) {
-    f << " " << name << "=_tmpl_" << name;
-  }
-  f << endl;
   // eq
   for(auto name : outputnames) {
     f << ".names";
@@ -1128,6 +1132,12 @@ void Blif::gen_top(string topfilename, string pfilename) {
     f << "1";
   }
   f << " 1" << endl;
+  // options
+  fsels.clear();
+  fsels.resize(nsels);
+  int namos = 0;
+  int maxcand = 0;
+  write_constraints(f, pfilename, namos, maxcand);
   // cardinality
   set<set<int> > sscand;
   for(auto vcand : mcand) {
@@ -1137,24 +1147,45 @@ void Blif::gen_top(string topfilename, string pfilename) {
     }
     sscand.insert(scand);
   }
-  int namos = 0;
-  int maxcand = 0;
   for(auto scand : sscand) {
-    f << ".subckt amo";
-    int i = 0;
+    int n1 = 0;
+    int nf = 0;
     for(auto cand : scand) {
-      f << " i" << i++ << "=s" << cand;
+      if(fsels[cand] == -2) {
+	n1++;
+      }
+      if(fsels[cand]) {
+	nf++;
+      }
     }
-    f << " out=_amo" << namos++;
-    f << endl;
-    if(maxcand < i) {
-      maxcand = i;
+    assert(n1 <= 1);
+    assert(nf <= scand.size());
+    if(nf < scand.size()) {
+      if(!n1) {
+	f << ".subckt amo";
+	int i = 0;
+	for(auto cand : scand) {
+	  if(!fsels[cand]) {
+	    f << " i" << i++ << "=s" << cand;
+	  }
+	}
+	f << " out=_amo" << namos++;
+	f << endl;
+	if(maxcand < i) {
+	  maxcand = i;
+	}
+      }
+      else {
+	for(auto cand : scand) {
+	  if(!fsels[cand]) {
+	    fsels[cand] = -1;
+	    nsels--;
+	  }
+	}
+      }
     }
   }
-  // options
-  fsels.clear();
-  fsels.resize(nsels);
-  write_constraints(f, pfilename, namos, maxcand);
+  // inputs
   f << ".inputs";
   for(int i = 0; i < nsels; i++) {
     if(fsels[i]) {
@@ -1164,6 +1195,20 @@ void Blif::gen_top(string topfilename, string pfilename) {
   }
   for(auto name : inputnames) {
     f << " " << name;
+  }
+  f << endl;
+  // tmpl
+  f << ".subckt tmpl";
+  for(auto name : inputnames) {
+    f << " " << name << "=" << name;
+  }
+  for(int i = 0; i < nsels; i++) {
+    if(fsels[i] >= 0) {
+      f << " s" << i << "=s" << i;
+    }
+  }
+  for(auto name : outputnames) {
+    f << " " << name << "=_tmpl_" << name;
   }
   f << endl;
   // condition
