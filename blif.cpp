@@ -45,6 +45,16 @@ string write_opnode(ofstream &f, opnode *p, int &id, vector<string> &inputnames)
   return name;
 }
 
+void idclear_opnode(opnode *p, int ninputs) {
+  if(p->id < ninputs) {
+    return;
+  }
+  p->id = -1;
+  for(auto c : p->vc) {
+    idclear_opnode(c, ninputs);
+  }
+}
+
 void Blif::gen_spec(string specfilename, vector<opnode *> &outputs) {
   specfilename_ = specfilename;
   ofstream f(specfilename);
@@ -317,6 +327,7 @@ void Blif::gen_tmpl(string tmplfilename, int ncycles, int nregs, int nnodes, int
     f << ".names " << name << " out" << endl;
     f << "1 1" << endl;
     f << ".end" << endl;
+    idclear_opnode(p, nops);
   }
 }
 
@@ -810,6 +821,264 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
   assert(count == nconstraints);
 }
 
+
+
+void rewrite_tmpl(string tmplfilename, int ncycles, int nregs, int nnodes, int nops, vector<opnode *> &operators, vector<pair<int, int> > &coms, vector<string> &inputnames, vector<string> &outputnames, vector<int> &fsels) {
+  int nsels = 0;
+  
+  ofstream f(tmplfilename);
+  if(!f) {
+    show_error("cannot open tmpl file");
+  }
+  f << ".model tmpl" << endl;
+  f << ".inputs";
+  for(auto name : inputnames) {
+    f << " " << name;
+  }
+  f << endl;
+  f << ".outputs";
+  for(auto name : outputnames) {
+    f << " " << name;
+  }
+  f << endl;
+
+  vector<vector<int> > recv(nnodes);
+  for(int i = 0; i < coms.size(); i++) {
+    auto com = coms[i];
+    recv[com.second].push_back(i);
+  }
+
+  int maxsel = 0;
+  for(int t = 0; t < ncycles; t++) {
+    for(int n = 0; n < nnodes; n++) {
+      // register
+      for(int r = 0; r < nregs; r++) {
+	string name = "reg_t" + to_string(t) + "n" + to_string(n) + "r" + to_string(r);
+	// first cycle
+	if(t == 0) {
+	  f << ".subckt mux";
+	  f << " k=" << name;
+	  int i = 0;
+	  int j = 0;
+	  for(; i < inputnames.size();) {
+	    if(fsels[nsels] >= 0 || fsels[nsels] == -2) {
+	      f << " i" << j << "=" << inputnames[i];
+	      f << " j" << j << "=s" << nsels;
+	      j++;
+	    }
+	    i++;
+	    nsels++;
+	  }
+	  f << endl;
+	  if(j > maxsel) {
+	    maxsel = j;
+	  }
+	}
+	// the subsequent cycles
+	else {
+	  f << ".subckt mux";
+	  f << " k=" << name;
+	  int i = 0;
+	  int j = 0;
+	  string s;
+	  for(; i < nregs;) {
+	    if(fsels[nsels] >= 0 || fsels[nsels] == -2) {
+	      s = "reg_t" + to_string(t-1) + "n" + to_string(n) + "r" + to_string(i);
+	      f << " i" << j << "=" << s;
+	      f << " j" << j << "=s" << nsels;
+	      j++;
+	    }
+	    i++;
+	    nsels++;
+	  }
+	  if(fsels[nsels] >= 0 || fsels[nsels] == -2) {
+	    s = "ope_t" + to_string(t-1) + "n" + to_string(n);
+	    f << " i" << j << "=" << s;
+	    f << " j" << j << "=s" << nsels;
+	    j++;
+	  }
+	  i++;
+	  nsels++;
+	  for(auto p : recv[n]) {
+	    if(fsels[nsels] >= 0 || fsels[nsels] == -2) {	    
+	      s = "com_t" + to_string(t-1) + "p" + to_string(p);
+	      f << " i" << j << "=" << s;
+	      f << " j" << j << "=s" << nsels;
+	      j++;
+	    }
+	    i++;
+	    nsels++;
+	  }
+	  f << endl;
+	  if(j > maxsel) {
+	    maxsel = j;
+	  }
+	}
+      }
+      // operation
+      string name = "ope_t" + to_string(t) + "n" + to_string(n);
+      string s;
+      for(int i = 0; i < operators.size(); i++) {
+	s = name + "o" + to_string(i);
+	f << ".subckt ope" << i;
+	f << " out=" << s;
+	for(int j = 0; j < nops; j++) {
+	  char c = 'a' + j;
+	  string r = "reg_t" + to_string(t) + "n" + to_string(n) + "r" + to_string(j);
+	  f << " " << c << "=" << r;
+	}
+	f << endl;
+      }
+      f << ".subckt mux";
+      f << " k=" << name;
+      int i = 0;
+      int j = 0;
+      for(; i < operators.size();) {
+	if(fsels[nsels] >= 0 || fsels[nsels] == -2) {
+	  s = name + "o" + to_string(i);
+	  f << " i" << j << "=" << s;
+	  f << " j" << j << "=s" << nsels;
+	  j++;
+	}
+	i++;
+	nsels++;
+      }
+      f << endl;
+      if(j > maxsel) {
+	maxsel = j;
+      }
+    }
+    if(t == ncycles-1) {
+      break;
+    }
+    // communication
+    for(int p = 0; p < coms.size(); p++) {
+      string name = "com_t" + to_string(t) + "p" + to_string(p);
+      int n = coms[p].first;
+      f << ".subckt mux";
+      f << " k=" << name;
+      int i = 0;
+      int j = 0;
+      string s;
+      for(; i < nregs;) {
+	if(fsels[nsels] >= 0 || fsels[nsels] == -2) {
+	  s = "reg_t" + to_string(t) + "n" + to_string(n) + "r" + to_string(i);
+	  f << " i" << j << "=" << s;
+	  f << " j" << j << "=s" << nsels;
+	  j++;
+	}
+	i++;
+	nsels++;
+      }
+      /*
+      s = "ope_t" + to_string(t) + "n" + to_string(n);
+      f << " i" << i << "=" << s;
+      f << " j" << i << "=s" << nsels;
+      vcand.push_back(make_pair(nsels, s));
+      i++;
+      nsels++;
+      */
+      f << endl;
+      if(j > maxsel) {
+	maxsel = j;
+      }
+    }
+  }
+  // outputs
+  for(auto name : outputnames) {
+    f << ".subckt mux";
+    f << " k=" << name;
+    int i = 0;
+    int j = 0;
+    string s;
+    int t = ncycles-1;
+    for(int n = 0; n < nnodes; n++) {
+      for(int r = 0; r < nregs; r++) {
+	if(fsels[nsels] >= 0 || fsels[nsels] == -2) {
+	  s = "reg_t" + to_string(t) + "n" + to_string(n) + "r" + to_string(r);
+	  f << " i" << j << "=" << s;
+	  f << " j" << j << "=s" << nsels;
+	  j++;
+	}
+	i++;
+	nsels++;
+      }
+      if(fsels[nsels] >= 0 || fsels[nsels] == -2) {
+	s = "ope_t" + to_string(t) + "n" + to_string(n);
+	f << " i" << j << "=" << s;
+	f << " j" << j << "=s" << nsels;
+	j++;
+      }
+      i++;
+      nsels++;
+    }
+    f << endl;
+    if(j > maxsel) {
+      maxsel = j;
+    }
+  }
+  // add select signals to inputs
+  f << ".inputs";
+  for(int i = 0; i < nsels; i++) {
+    if(fsels[nsels] >= 0 || fsels[nsels] == -2) {
+      f << " s" << i;
+    }
+  }
+  f << endl;
+  f << ".end" << endl;
+  // mux
+  f << ".model mux" << endl;
+  f << ".inputs";
+  for(int i = 0; i < maxsel; i++) {
+    f << " i" << i;
+    f << " j" << i;
+  }
+  f << endl;
+  f << ".outputs k" << endl;
+  f << ".names";
+  for(int i = 0; i < maxsel; i++) {
+    f << " i" << i;
+    f << " j" << i;
+  }
+  f << " k" << endl;
+  for(int i = 0; i < maxsel; i++) {
+    for(int j = 0; j < maxsel; j++) {
+      if(i == j) {
+	f << "11";
+      }
+      else {
+	f << "--";
+      }
+    }
+    f << " 1" << endl;
+  }
+  f << ".end" << endl;
+  // operators
+  for(int i = 0; i < operators.size(); i++) {
+    f << ".model ope" << i << endl;
+    f << ".inputs";
+    vector<string> opnames;
+    for(int j = 0; j < nops; j++) {
+      char c = 'a' + j;
+      f << " " << c;
+      string s{c};
+      opnames.push_back(s);
+    }
+    f << endl;
+    f << ".outputs out" << endl;
+    auto p = operators[i];
+    int id = nops;
+    string name = write_opnode(f, p, id, opnames);
+    f << ".names " << name << " out" << endl;
+    f << "1 1" << endl;
+    f << ".end" << endl;
+    idclear_opnode(p, nops);
+  }
+}
+
+
+
+
 void Blif::gen_top(string topfilename, string pfilename) {
   topfilename_ = topfilename;
   ofstream f(topfilename);
@@ -938,6 +1207,7 @@ void Blif::gen_top(string topfilename, string pfilename) {
     
   f << ".end" << endl;
   f.close();
+  rewrite_tmpl(tmplfilename_, ncycles_, nregs_, nnodes_, nops_, operators_, coms_, inputnames, outputnames, fsels);
   string cmd = "cat " + specfilename_ + " " + tmplfilename_ + " >> " + topfilename;
   system(cmd.c_str());
 }

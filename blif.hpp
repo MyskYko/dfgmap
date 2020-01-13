@@ -40,7 +40,7 @@ private:
   std::vector<int> fsels;
   int nsels_;
   void write_constraints(std::ofstream &f, std::string pfilename, int &namos, int &maxcand);
-
+  
   std::vector<int> result;
 };
 

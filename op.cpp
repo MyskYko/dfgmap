@@ -210,7 +210,7 @@ void gen_operands(opnode *p, int &ndata, vector<set<set<int> > > &operands, map<
 }
 
 string gen_opstr(opnode *p, vector<string> &datanames) {
-  if(p->id < datanames.size()) {
+  if(p->id != -1) {
     return datanames[p->id];
   }
   assert(p->vc.size() == 2);
