@@ -741,6 +741,63 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	}
       }
     }
+    if(vs[0] == ".repeat") {
+      while(getline(pfile, str)) {
+	vs.clear();
+	stringstream ss(str);
+	while(getline(ss, s, ' ')) {
+	  vs.push_back(s);
+	}
+	if(vs.empty()) {
+	  continue;
+	}
+	if(vs[0][0] == '.') {
+	  break;
+	}
+	for(int j = 1; j < vs.size(); j++) {
+	  int t0, t;
+	  try {
+	    t0 = stoi(vs[0])-1;
+	    t = stoi(vs[j])-1;
+	  } catch (...) {
+	    show_error("unexpected error at option repeat");
+	  }
+	  for(int n = 0; n < nnodes_; n++) {
+	    for(int r = 0; r < nregs_; r++) {
+	      string name0 = "reg_t" + to_string(t0) + "n" + to_string(n) + "r" + to_string(r);
+	      string name = "reg_t" + to_string(t) + "n" + to_string(n) + "r" + to_string(r);
+	      assert(mcand[name0].size() == mcand[name].size());
+	      for(int i = 0; i < mcand[name0].size(); i++) {
+		auto cand0 = mcand[name0][i];
+		auto cand = mcand[name][i];
+		if(fsels[cand0.first] < 0) {
+		  assert(fsels[cand0.first] == fsels[cand.first]);
+		}
+		if(fsels[cand0.first] > 0) {
+		  assert(fsels[cand.first] > 0);
+		  int id0 = fsels[cand0.first];
+		  while(fsels[id0-1] > 0) {
+		    id0 = fsels[id0-1];
+		  }
+		  int id = fsels[cand.first];
+		  while(fsels[id-1] > 0) {
+		    id = fsels[id-1];
+		  }
+		  assert(id0 == id);
+		}
+		if(fsels[cand0.first]) {
+		  continue;
+		}
+		f << ".names s" << cand0.first << " s" << cand.first << endl;
+		f << "1 1" << endl;
+		fsels[cand.first] = cand0.first + 1;
+		nconstraints++;
+	      }
+	    }
+	  }
+	}
+      }
+    }
   }
 
   nsels_ = nsels - nconstraints;
@@ -943,7 +1000,11 @@ int Blif::synthesize(string logfilename) {
   }
   for(int i = 0; i < nsels; i++) {
     if(fsels[i] > 0) {
-      result_[i] = result_[fsels[i]-1];
+      int id = fsels[i];
+      while(fsels[id-1] > 0) {
+	id = fsels[id-1];
+      }
+      result_[i] = result_[id-1];
     }
   }
   assert(j == nsels_);
