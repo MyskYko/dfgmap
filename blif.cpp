@@ -353,6 +353,7 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	}
 	int t = 0;
 	vector<vector<int> > fcand;
+	int ncand = 0;
 	fcand.resize(nnodes_);
 	for(int n = 0; n < nnodes_; n++) {
 	  fcand[n].resize(nregs_);
@@ -374,23 +375,35 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	      }
 	      assert(r >= 0 && r < nregs_);
 	      fcand[nodename2id[name]][r] = 1;
+	      ncand++;
 	    }
 	  }
 	  else {
 	    for(int r = 0; r < nregs_; r++) {
 	      fcand[nodename2id[name]][r] = 1;
+	      ncand++;
 	    }
 	  }
 	}
 	for(int n = 0; n < nnodes_; n++) {
 	  for(int r = 0; r < nregs_; r++) {
+	    string name = "reg_t" + to_string(t) + "n" + to_string(n) + "r" + to_string(r);
 	    if(fcand[n][r]) {
+	      if(ncand == 1) {
+		for(auto cand : mcand[name]) {
+		  if(cand.second == vs[0]) {
+		    f << ".names s" << cand.first << endl;
+		    f << "1" << endl;
+		    fsels[cand.first] = -2;
+		    nconstraints++;
+		  }
+		}
+	      }
 	      continue;
 	    }
-	    string name = "reg_t" + to_string(t) + "n" + to_string(n) + "r" + to_string(r);
 	    for(auto cand : mcand[name]) {
 	      if(cand.second == vs[0]) {
-		fsels[cand.first] = 1;
+		fsels[cand.first] = -1;
 		nconstraints++;
 	      }
 	    }
@@ -412,6 +425,7 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	  break;
 	}
 	vector<vector<int> > fcand;
+	int ncand = 0;
 	fcand.resize(nnodes_);
 	for(int n = 0; n < nnodes_; n++) {
 	  fcand[n].resize(nregs_+1);
@@ -436,11 +450,13 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	      }
 	      assert(r >= 0 && r <= nregs_);
 	      fcand[nodename2id[name]][r] = 1;
+	      ncand++;
 	    }
 	  }
 	  else {
 	    for(int r = 0; r < nregs_+1; r++) {
 	      fcand[nodename2id[name]][r] = 1;
+	      ncand++;
 	    }
 	  }
 	}
@@ -463,9 +479,15 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	  if(sr.empty()) {
 	    // ope
 	    if(fcand[n][nregs_]) {
+	      if(ncand == 1) {
+		f << ".names s" << cand.first << endl;
+		f << "1" << endl;
+		fsels[cand.first] = -2;
+		nconstraints++;
+	      }
 	      continue;
 	    }
-	    fsels[cand.first] = 1;
+	    fsels[cand.first] = -1;
 	    nconstraints++;
 	    continue;
 	  }
@@ -477,9 +499,15 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	    show_error("unexpected error at option assign_outputs");
 	  }
 	  if(fcand[n][r]) {
+	    if(ncand == 1) {
+	      f << ".names s" << cand.first << endl;
+	      f << "1" << endl;
+	      fsels[cand.first] = -2;
+	      nconstraints++;
+	    }
 	    continue;
 	  }
-	  fsels[cand.first] = 1;
+	  fsels[cand.first] = -1;
 	  nconstraints++;
 	}
       }      
@@ -498,6 +526,7 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	  break;
 	}
 	vector<int> fcand;
+	int ncand = 0;
 	fcand.resize(nregs_+2);
 	for(int i = 1; i < vs.size(); i++) {
 	  int r;
@@ -514,6 +543,7 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	  }
 	  assert(r >= 0 && r <= nregs_+1);
 	  fcand[r] = 1;
+	  ncand++;
 	}
 	int r1;
 	try {
@@ -529,18 +559,30 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	      if(cand.second.find("ope") != string::npos) {
 		// ope
 		if(fcand[nregs_]) {
+		  if(ncand == 1) {
+		    f << ".names s" << cand.first << endl;
+		    f << "1" << endl;
+		    fsels[cand.first] = -2;
+		    nconstraints++;
+		  }
 		  continue;
 		}
-		fsels[cand.first] = 1;
+		fsels[cand.first] = -1;
 		nconstraints++;
 		continue;
 	      }
 	      if(cand.second.find("com") != string::npos) {
 		// com
 		if(fcand[nregs_+1]) {
+		  if(ncand == 1) {
+		    f << ".names s" << cand.first << endl;
+		    f << "1" << endl;
+		    fsels[cand.first] = -2;
+		    nconstraints++;
+		  }
 		  continue;
 		}
-		fsels[cand.first] = 1;
+		fsels[cand.first] = -1;
 		nconstraints++;
 		continue;
 	      }
@@ -556,9 +598,15 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 		show_error("unexpected error at option assign_regs");
 	      }
 	      if(fcand[r2]) {
+		if(ncand == 1) {
+		  f << ".names s" << cand.first << endl;
+		  f << "1" << endl;
+		  fsels[cand.first] = -2;
+		  nconstraints++;
+		}
 		continue;
 	      }
-	      fsels[cand.first] = 1;
+	      fsels[cand.first] = -1;
 	      nconstraints++;
 	    }
 	  }
@@ -579,6 +627,7 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	  break;
 	}
 	vector<int> fcand;
+	int ncand = 0;
 	fcand.resize(nregs_+1);
 	for(int i = 1; i < vs.size(); i++) {
 	  int r;
@@ -592,6 +641,7 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	  }
 	  assert(r >= 0 && r <= nregs_);
 	  fcand[r] = 1;
+	  ncand++;
 	}
 	int p;
 	try {
@@ -614,9 +664,15 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	      show_error("unexpected error at option assign_coms");
 	    }
 	    if(fcand[r]) {
+	      if(ncand == 1) {
+		f << ".names s" << cand.first << endl;
+		f << "1" << endl;
+		fsels[cand.first] = -2;
+		nconstraints++;
+	      }
 	      continue;
 	    }
-	    fsels[cand.first] = 1;
+	    fsels[cand.first] = -1;
 	    nconstraints++;
 	  }
 	}
@@ -656,7 +712,7 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	  for(auto cand : mcand[name]) {
 	    f << ".names s" << cand.first << endl;
 	    f << "1" << endl;
-	    fsels[cand.first] = 1;
+	    fsels[cand.first] = -2;
 	    nconstraints++;
 	  }
 	}
@@ -678,7 +734,7 @@ void Blif::write_constraints(ofstream &f, string pfilename, int &namos, int &max
 	      }
 	      f << ".names s" << cand0.first << " s" << cand.first << endl;
 	      f << "1 1" << endl;
-	      fsels[cand.first] = 1;
+	      fsels[cand.first] = cand0.first + 1;
 	      nconstraints++;
 	    }
 	  }
@@ -872,11 +928,22 @@ int Blif::synthesize(string logfilename) {
   vector<int> result_;
   int j = 0;
   for(int i = 0; i < nsels; i++) {
-    if(fsels[i]) {
+    if(fsels[i] == -1) {
+      result_.push_back(0);
+    }
+    else if(fsels[i] == -2) {
+      result_.push_back(1);
+    }
+    else if(fsels[i] > 0) {
       result_.push_back(0);
     }
     else {
       result_.push_back(result[j++]);
+    }
+  }
+  for(int i = 0; i < nsels; i++) {
+    if(fsels[i] > 0) {
+      result_[i] = result_[fsels[i]-1];
     }
   }
   assert(j == nsels_);
