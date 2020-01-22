@@ -1,0 +1,7 @@
+.assign
+rom1 x1
+rom2 x2
+rom3 x3
+rom4 x4
+romw w1_1 w1_2 w1_3 w1_4 w2_1 w2_2 w2_3 w2_4 w3_1 w3_2 w3_3 w3_4 w4_1 w4_2 w4_3 w4_4
+
