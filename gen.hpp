@@ -19,6 +19,8 @@ public:
 
   void reduce_image();
 
+  std::map<int, std::set<int> > fixout;
+
 private:
   int nnodes;
   int ndata;

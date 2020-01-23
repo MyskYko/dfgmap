@@ -360,9 +360,17 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem, string cnfname) {
   fcnf << "c conditions for input nodes" << endl;
   for(int k = 1; k < ncycles; k++) {
     for(int j : i_nodes) {
-      for(int i = 0; i < ndata; i++) {
+      for(int i = 0; i < ninputs; i++) {
 	fcnf << "-" << k*nnodes*ndata + j*ndata + i + 1 << " ";
 	fcnf << (k-1)*nnodes*ndata + i + 1 << " ";
+	fcnf << 0 << endl; 
+	nclauses++;
+      }
+      for(int i = ninputs; i < ndata; i++) {
+	fcnf << "-" << k*nnodes*ndata + j*ndata + i + 1 << " ";
+	if(fexmem) {
+	  fcnf << (k-1)*nnodes*ndata + i + 1 << " ";
+	}
 	fcnf << 0 << endl; 
 	nclauses++;
       }
@@ -573,6 +581,22 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem, string cnfname) {
       }
       else {
 	cardinality_amk(nvars, nclauses, vVars, fcnf, band);
+      }
+    }
+  }
+
+  if(fixout.size()) {
+    for(int k = 0; k < ncycles; k++) {
+      for(auto elem : fixout) {
+	int j = elem.first;
+	for(int i = 0; i < ndata; i++) {
+	  if(elem.second.count(i)) {
+	    continue;
+	  }
+	  fcnf << "-" << k*nnodes*ndata + j*ndata + i + 1 << " ";
+	  fcnf << 0 << endl;
+	  nclauses++;
+	}
       }
     }
   }

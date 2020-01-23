@@ -330,6 +330,7 @@ int main(int argc, char** argv) {
   // read option file
   ifstream gfile(gfilename);
   map<int, set<int> > assignments;
+  map<int, set<opnode *> > fixout;
   set<int> sinputs;
   for(int i = 0; i < ninputs; i++) {
     sinputs.insert(i);
@@ -399,6 +400,33 @@ int main(int argc, char** argv) {
 	  }
 	}
       }
+      if(vs[0] == ".fixout") {
+	while(getline(gfile, str)) {
+	  vs.clear();
+	  stringstream ss2(str);
+	  while(getline(ss2, s, ' ')) {
+	    vs.push_back(s);
+	  }
+	  if(vs.empty()) {
+	    continue;
+	  }
+	  if(vs[0][0] == '.') {
+	    break;
+	  }
+	  int id = node_name2id[vs[0]];
+	  if(!id) {
+	    show_error("node " + vs[0] + " does not exist");
+	  }
+	  set<opnode *> s;
+	  for(int i = 1; i < vs.size(); i++) {
+	    if(!data_name2opnode.count(vs[i])) {
+	      show_error("data " + vs[i] + " does not exist");
+	    }
+	    s.insert(data_name2opnode[vs[i]]);
+	  }
+	  fixout[id] = s;
+	}
+      }
     }
     
     if(nverbose >= 2) {
@@ -456,6 +484,18 @@ int main(int argc, char** argv) {
 
   // instanciate problem generator
   Gen gen = Gen(i_nodes, o_nodes, pe_nodes, rom_nodes, coms, com2band, ninputs, output_ids, assignments, operands);
+  
+  if(fixout.size()) {
+    gen.fixout.clear();
+    for(auto elem : fixout) {
+      int j = elem.first;
+      set<int> s;
+      for(auto p : elem.second) {
+	s.insert(p->id);
+      }
+      gen.fixout[j] = s;
+    }
+  }
 
   if(finc && ncycles < 1) {
     ncycles = 1;
