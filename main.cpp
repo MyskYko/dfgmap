@@ -541,7 +541,7 @@ int main(int argc, char** argv) {
 
   gen.gen_image(rfilename);
 
-  //  gen.reduce_image();
+  gen.reduce_image();
   
   if(nverbose) {
     cout << "### results ###" << endl;

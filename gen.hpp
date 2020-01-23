@@ -32,7 +32,7 @@ private:
   std::vector<std::tuple<int, int, int> > coms;
   std::set<int> output_ids;
   std::map<int, std::set<int> > assignments;
-  std::vector<std::set<std::set<int> > > operands; // vect is better?
+  std::vector<std::set<std::set<int> > > operands;
 
   std::vector<std::set<int> > cons;
   std::vector<std::set<int> > concoms;
@@ -42,9 +42,6 @@ private:
   std::map<int, int> pe2reg;
   int nr;
   int nc;
-  
-  int fexmem_;
-  int nnodes_;
 };
 
 #endif // GEN_HPP

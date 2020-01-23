@@ -1,6 +1,6 @@
 .o o1 o2 o3 o4
 .pe pe1 pe2 pe3 pe4
-.rom rom1 rom2 rom3 rom4 romw
+.rom rom1 rom2 rom3 rom4
 .com
 pe1 pe2 1
 pe2 pe3 1
@@ -10,10 +10,6 @@ rom1 pe1
 rom2 pe2
 rom3 pe3
 rom4 pe4
-romw pe1
-romw pe2
-romw pe3
-romw pe4
 pe1 o1
 pe2 o2
 pe3 o3
