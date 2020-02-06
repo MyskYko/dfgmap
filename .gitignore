@@ -1,5 +1,5 @@
 gen
-test
+test*
 *.o
 _*
 cplex.log
