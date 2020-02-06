@@ -36,6 +36,7 @@ int main(int argc, char** argv) {
   int finc = 0;
   int ncycles = 0;
   int nregs = 1;
+  int npipeline = 0;
   int nverbose = 0;
 
   // read options
@@ -101,6 +102,14 @@ int main(int argc, char** argv) {
 	  show_error("the number of registers must not be 0");
 	}
 	break;
+      case 's':
+	try {
+	  npipeline = stoi(argv[++i]);
+	}
+	catch(...) {
+	  show_error("-s must be followed by integer");
+	}
+	break;
       case 'v':
 	if(i+1 >= argc || argv[i+1][0] == '-') {
 	  nverbose = 1;
@@ -126,6 +135,7 @@ int main(int argc, char** argv) {
 	cout << "\t-x       : toggle using external memory to store intermediate data [default = " << fexmem << "]" << endl;
 	cout << "\t-t       : toggle incremental synthesis [default = " << finc << "]" << endl;
 	cout << "\t-r <int> : the number of registers in each PE (minus will be treated as no limit) [default = " << nregs << "]" << endl;
+	cout << "\t-s <int> : the number of cycles for pipeline [default = " << npipeline << "]" << endl;
 	cout << "\t-v <int> : toggle verbosing information [default = " << nverbose << "]" << endl;
 	cout << "\t           \t0 : nothing" << endl;
 	cout << "\t           \t1 : results" << endl;
@@ -531,7 +541,7 @@ int main(int argc, char** argv) {
     // }
     // else {
     // SAT solver
-    gen.gen_cnf(ncycles, nregs, fexmem, cfilename);
+    gen.gen_cnf(ncycles, nregs, fexmem, npipeline, cfilename);
     system(satcmd.c_str());
     ifstream rfile(rfilename);
     if(!rfile) {

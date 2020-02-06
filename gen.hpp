@@ -11,7 +11,7 @@ public:
 
   Gen(std::vector<int> i_nodes, std::vector<int> o_nodes, std::vector<int> pe_nodes, std::vector<int> rom_nodes, std::set<std::pair<int, int> > &coms_, std::map<std::pair<int, int>, int> &com2band, int ninputs, std::set<int> output_ids, std::map<int, std::set<int> > assignments, std::vector<std::set<std::set<int> > > operands);
   
-  void gen_cnf(int ncycles, int nregs, int fexmem, std::string cnfname);
+  void gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, std::string cnfname);
   //  void gen_ilp(int ncycles, int nregs, int fexmem, std::string lpname);
   
   void gen_image(std::string rfilename);

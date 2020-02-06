@@ -306,7 +306,7 @@ void Gen::gen_image(string rfilename) {
 // }
 
 
-void Gen::gen_cnf(int ncycles, int nregs, int fexmem, string cnfname) {
+void Gen::gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, string cnfname) {
   ncycles_ = ncycles;
   pe2reg.clear();
   if(nregs != 1) {
@@ -503,45 +503,103 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem, string cnfname) {
 
   // at most 1 for x
   fcnf << "c at most 1 for x" << endl;
-  for(int k = 1; k < ncycles; k++) {
-    for(int j : i_nodes) {
-      vector<int> vVars;
-      for(int i = 0; i < ndata; i++) {
-	vVars.push_back(k*nnodes*ndata + j*ndata + i + 1);
-      }
-      cardinality_am1(nvars, nclauses, vVars, fcnf);
-    }
-    for(int j : o_nodes) {
-      vector<int> vVars;
-      for(int i = 0; i < ndata; i++) {
-	vVars.push_back(k*nnodes*ndata + j*ndata + i + 1);
-      }
-      cardinality_am1(nvars, nclauses, vVars, fcnf);
-    }
-    for(int j : pe_nodes) {
-      vector<int> vVars;
-      for(int i = 0; i < ndata; i++) {
-	vVars.push_back(k*nnodes*ndata + j*ndata + i + 1);
-      }
-      cardinality_am1(nvars, nclauses, vVars, fcnf);
-    }
-  }
-
-  // at most K for r
-  fcnf << "c at most K for r" << endl;
-  if(nregs > 1) {
-    vector<int> vVars;
+  if(!npipeline) {
     for(int k = 1; k < ncycles; k++) {
+      for(int j : i_nodes) {
+	vector<int> vVars;
+	for(int i = 0; i < ndata; i++) {
+	  vVars.push_back(k*nnodes*ndata + j*ndata + i + 1);
+	}
+	cardinality_am1(nvars, nclauses, vVars, fcnf);
+      }
+      for(int j : o_nodes) {
+	vector<int> vVars;
+	for(int i = 0; i < ndata; i++) {
+	  vVars.push_back(k*nnodes*ndata + j*ndata + i + 1);
+	}
+	cardinality_am1(nvars, nclauses, vVars, fcnf);
+      }
       for(int j : pe_nodes) {
 	vector<int> vVars;
 	for(int i = 0; i < ndata; i++) {
-	  vVars.push_back(nr + k*npes*ndata + pe2reg[j]*ndata + i + 1);
+	  vVars.push_back(k*nnodes*ndata + j*ndata + i + 1);
 	}
-	cardinality_amk(nvars, nclauses, vVars, fcnf, nregs-1);
+	cardinality_am1(nvars, nclauses, vVars, fcnf);
       }
     }
   }
-
+  else {
+    for(int t = 0; t < npipeline; t++) {
+      for(int j : i_nodes) {
+	vector<int> vVars;
+	for(int k = t+1; k < ncycles; k += npipeline) {
+	  for(int i = 0; i < ndata; i++) {
+	    vVars.push_back(k*nnodes*ndata + j*ndata + i + 1);
+	  }
+	}
+	cardinality_am1(nvars, nclauses, vVars, fcnf);
+      }
+      for(int j : o_nodes) {
+	vector<int> vVars;
+	for(int k = t+1; k < ncycles; k += npipeline) {
+	  for(int i = 0; i < ndata; i++) {
+	    vVars.push_back(k*nnodes*ndata + j*ndata + i + 1);
+	  }
+	}
+	cardinality_am1(nvars, nclauses, vVars, fcnf);
+      }
+      for(int j : pe_nodes) {
+	vector<int> vVars;
+	for(int k = t+1; k < ncycles; k += npipeline) {
+	  for(int i = 0; i < ndata; i++) {
+	    vVars.push_back(k*nnodes*ndata + j*ndata + i + 1);
+	  }
+	}
+	cardinality_am1(nvars, nclauses, vVars, fcnf);
+      }
+    }
+  }
+  // at most K for r
+  fcnf << "c at most K for r" << endl;
+  if(nregs > 1) {
+    if(!npipeline) {
+      vector<int> vVars;
+      for(int k = 1; k < ncycles; k++) {
+	for(int j : pe_nodes) {
+	  vector<int> vVars;
+	  for(int i = 0; i < ndata; i++) {
+	    vVars.push_back(nr + k*npes*ndata + pe2reg[j]*ndata + i + 1);
+	  }
+	  if(nregs == 2) {
+	    cardinality_am1(nvars, nclauses, vVars, fcnf);
+	  }
+	  else {
+	    cardinality_amk(nvars, nclauses, vVars, fcnf, nregs-1);
+	  }
+	}
+      }
+    }
+    else {
+      vector<int> vVars;
+      for(int t = 0; t < npipeline; t++) {
+	for(int j : pe_nodes) {
+	  vector<int> vVars;
+	  for(int k = t+1; k < ncycles; k += npipeline) {
+	    for(int i = 0; i < ndata; i++) {
+	      vVars.push_back(nr + k*npes*ndata + pe2reg[j]*ndata + i + 1);
+	    }
+	  }
+	  if(nregs == 2) {
+	    cardinality_am1(nvars, nclauses, vVars, fcnf);
+	  }
+	  else {
+	    cardinality_amk(nvars, nclauses, vVars, fcnf, nregs-1);
+	  }
+	}
+      }
+    }
+  }
+  
   // final condition
   fcnf << "c final condition" << endl;
   for(int i : output_ids) {
@@ -569,18 +627,39 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem, string cnfname) {
 
   // at most 1 or K for communication
   fcnf << "c at most 1 or K for communication" << endl;
-  for(int k = 0; k < ncycles; k++) {
-    for(int h = 0; h < ncoms; h++) {
-      vector<int> vVars;
-      for(int i = 0; i < ndata; i++) {
-	vVars.push_back(nc + k*ncoms*ndata + h*ndata + i + 1);
+  if(!npipeline) {
+    for(int k = 0; k < ncycles; k++) {
+      for(int h = 0; h < ncoms; h++) {
+	vector<int> vVars;
+	for(int i = 0; i < ndata; i++) {
+	  vVars.push_back(nc + k*ncoms*ndata + h*ndata + i + 1);
+	}
+	int band = get<2>(coms[h]);
+	if(band == 1) {
+	  cardinality_am1(nvars, nclauses, vVars, fcnf);	
+	}
+	else {
+	  cardinality_amk(nvars, nclauses, vVars, fcnf, band);
+	}
       }
-      int band = get<2>(coms[h]);
-      if(band == 1) {
-	cardinality_am1(nvars, nclauses, vVars, fcnf);	
-      }
-      else {
-	cardinality_amk(nvars, nclauses, vVars, fcnf, band);
+    }
+  }
+  else {
+    for(int t = 0; t < npipeline; t++) {
+      for(int h = 0; h < ncoms; h++) {
+	vector<int> vVars;
+	for(int k = t+1; k < ncycles; k += npipeline) {
+	  for(int i = 0; i < ndata; i++) {
+	    vVars.push_back(nc + k*ncoms*ndata + h*ndata + i + 1);
+	  }
+	}
+	int band = get<2>(coms[h]);
+	if(band == 1) {
+	  cardinality_am1(nvars, nclauses, vVars, fcnf);	
+	}
+	else {
+	  cardinality_amk(nvars, nclauses, vVars, fcnf, band);
+	}
       }
     }
   }
