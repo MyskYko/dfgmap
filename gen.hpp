@@ -20,7 +20,8 @@ public:
   void reduce_image();
 
   std::map<int, std::set<int> > fixout;
-
+  int finitread;
+  
 private:
   int nnodes;
   int ndata;

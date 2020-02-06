@@ -341,6 +341,7 @@ int main(int argc, char** argv) {
   ifstream gfile(gfilename);
   map<int, set<int> > assignments;
   map<int, set<opnode *> > fixout;
+  int finitread = 0;
   set<int> sinputs;
   for(int i = 0; i < ninputs; i++) {
     sinputs.insert(i);
@@ -437,6 +438,9 @@ int main(int argc, char** argv) {
 	  fixout[id] = s;
 	}
       }
+      if(vs[0] == ".initread") {
+	finitread = 1;
+      }
     }
     
     if(nverbose >= 2) {
@@ -506,6 +510,7 @@ int main(int argc, char** argv) {
       gen.fixout[j] = s;
     }
   }
+  gen.finitread = finitread;
 
   if(finc && ncycles < 1) {
     ncycles = 1;

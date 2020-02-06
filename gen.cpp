@@ -664,7 +664,9 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, string cnfn
     }
   }
 
+  // fixout
   if(fixout.size()) {
+    fcnf << "c fixout" << endl;
     for(int k = 0; k < ncycles; k++) {
       for(auto elem : fixout) {
 	int j = elem.first;
@@ -672,6 +674,27 @@ void Gen::gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, string cnfn
 	  if(elem.second.count(i)) {
 	    continue;
 	  }
+	  fcnf << "-" << k*nnodes*ndata + j*ndata + i + 1 << " ";
+	  fcnf << 0 << endl;
+	  nclauses++;
+	}
+      }
+    }
+  }
+  
+  // initread
+  if(finitread) {
+    fcnf << "c initread" << endl;
+    for(int i = 0; i < ndata; i++) {
+      vector<int> vVars;
+      for(int j : i_nodes) {
+	vVars.push_back(nnodes*ndata + j*ndata + i + 1);
+      }
+      cardinality_am1(nvars, nclauses, vVars, fcnf);
+    }
+    for(int k = 2; k < ncycles; k++) {
+      for(int j : i_nodes) {
+	for(int i = 0; i < ndata; i++) {
 	  fcnf << "-" << k*nnodes*ndata + j*ndata + i + 1 << " ";
 	  fcnf << 0 << endl;
 	  nclauses++;
