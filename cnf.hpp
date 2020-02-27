@@ -39,9 +39,6 @@ private:
   std::vector<std::set<int> > concoms;
   
   int ncycles_;
-  int freg;
-  std::map<int, int> pe2reg;
-  int nr;
   int nc;
 };
 

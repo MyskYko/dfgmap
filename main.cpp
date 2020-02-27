@@ -20,10 +20,10 @@ int main(int argc, char** argv) {
   string rfilename = "_test.out";
   string dfilename = "_out.dot";
   string ofilename = "out" + to_string(time(NULL));
-  //string satcmd = "minisat " + cfilename + " " + rfilename;
+  string satcmd = "minisat " + cfilename + " " + rfilename;
   //string satcmd = "glucose " + cfilename + " " + rfilename;
   //string satcmd = "lingeling " + cfilename + " > " + rfilename;
-  string satcmd = "plingeling " + cfilename + " > " + rfilename;
+  //string satcmd = "plingeling " + cfilename + " > " + rfilename;
   
   int fcompress = 0;
   int fmac = 1;
