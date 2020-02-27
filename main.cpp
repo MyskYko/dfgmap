@@ -7,7 +7,7 @@
 
 #include "global.hpp"
 #include "op.hpp"
-#include "gen.hpp"
+#include "cnf.hpp"
 
 using namespace std;
 
@@ -16,20 +16,15 @@ int main(int argc, char** argv) {
   string efilename = "e.txt";
   string ffilename = "f.txt";
   string gfilename = "g.txt";
-  string pfilename;
   string cfilename = "_test.cnf";
   string rfilename = "_test.out";
-  //  string ifilename = "_test.lp";
-  //  string sfilename = "_test.sol";
   string dfilename = "_out.dot";
   string ofilename = "out" + to_string(time(NULL));
-  string satcmd = "minisat " + cfilename + " " + rfilename;
-  //  string ilpcmd = "cplex -c \"read " + ifilename + "\" \"optimize\" \"write " + sfilename + "\"";
+  //string satcmd = "minisat " + cfilename + " " + rfilename;
   //string satcmd = "glucose " + cfilename + " " + rfilename;
   //string satcmd = "lingeling " + cfilename + " > " + rfilename;
-  //string satcmd = "plingeling " + cfilename + " > " + rfilename;
+  string satcmd = "plingeling " + cfilename + " > " + rfilename;
   
-  //  int filp = 0;
   int fcompress = 0;
   int fmac = 1;
   int fexmem = 0;
@@ -66,15 +61,6 @@ int main(int argc, char** argv) {
 	}
 	ffilename = argv[++i];
 	break;
-      case 'p':
-	if(i+1 >= argc) {
-	  show_error("-p must be followed by file name");
-	}
-	pfilename = argv[++i];
-	break;
-	//      case 'i':
-	//	filp ^= 1;
-	//	break;
       case 'c':
 	fcompress ^= 1;
 	break;
@@ -128,8 +114,6 @@ int main(int argc, char** argv) {
 	cout << "\t-n <int> : the number of cycles [default = " << ncycles << "]" << endl;
 	cout << "\t-e <str> : the name of environment file [default = \"" << efilename << "\"]" << endl;
 	cout << "\t-f <str> : the name of formula file [default = \"" << ffilename << "\"]" << endl;
-	cout << "\t-p <str> : the name of placement file to generate pngs [default = \"" << pfilename << "\"]" << endl;
-	//	cout << "\t-i       : toggle using ILP solver instead of SAT solver [default = " << filp << "]" << endl;
 	cout << "\t-c       : toggle transforming dataflow [default = " << fcompress << "]" << endl;
 	cout << "\t-m       : toggle using MAC operation [default = " << fmac << "]" << endl;
 	cout << "\t-x       : toggle using external memory to store intermediate data [default = " << fexmem << "]" << endl;
@@ -497,20 +481,20 @@ int main(int argc, char** argv) {
   }
 
   // instanciate problem generator
-  Gen gen = Gen(i_nodes, o_nodes, pe_nodes, rom_nodes, coms, com2band, ninputs, output_ids, assignments, operands);
+  Cnf cnf = Cnf(i_nodes, o_nodes, pe_nodes, rom_nodes, coms, com2band, ninputs, output_ids, assignments, operands);
   
   if(fixout.size()) {
-    gen.fixout.clear();
+    cnf.fixout.clear();
     for(auto elem : fixout) {
       int j = elem.first;
       set<int> s;
       for(auto p : elem.second) {
 	s.insert(p->id);
       }
-      gen.fixout[j] = s;
+      cnf.fixout[j] = s;
     }
   }
-  gen.finitread = finitread;
+  cnf.finitread = finitread;
 
   if(finc && ncycles < 1) {
     ncycles = 1;
@@ -525,28 +509,7 @@ int main(int argc, char** argv) {
   while(1) {
     cout << "ncycles : " << ncycles << endl;
     int r = 0;
-    // if(filp) {
-    //   // ILP solver
-    //   gen.gen_ilp(ncycles, nregs, fexmem, ifilename);
-    //   ifstream sfile(sfilename);
-    //   if(sfile) {
-    // 	sfile.close();
-    // 	string cmd = "rm -r " + sfilename;
-    // 	system(cmd.c_str());
-    //   }
-    // else {
-    // 	sfile.close();
-    //   }
-    //   system(ilpcmd.c_str());
-    //   sfile.open(sfilename);
-    //   if(sfile) {
-    // 	sfile.close();
-    // 	r = 1;
-    //   }
-    // }
-    // else {
-    // SAT solver
-    gen.gen_cnf(ncycles, nregs, fexmem, npipeline, cfilename);
+    cnf.gen_cnf(ncycles, nregs, fexmem, npipeline, cfilename);
     system(satcmd.c_str());
     ifstream rfile(rfilename);
     if(!rfile) {
@@ -589,22 +552,17 @@ int main(int argc, char** argv) {
     ncycles++;
   }
 
-  // if(filp) {
-  //   gen.gen_image_ilp(sfilename);
-  // }
-  // else {
+  cnf.gen_image(rfilename);
 
-  gen.gen_image(rfilename);
-
-  gen.reduce_image();
+  cnf.reduce_image();
   
   if(nverbose) {
     cout << "### results ###" << endl;
-    for(int k = 0; k < gen.image.size(); k++) {
+    for(int k = 0; k < cnf.image.size(); k++) {
       cout << "cycle " << k << " :" << endl;
-      for(int j = 0; j < gen.image[0].size(); j++) {
+      for(int j = 0; j < cnf.image[0].size(); j++) {
 	cout << "\tnode " << j << " :";
-	for(int i : gen.image[k][j]) {
+	for(int i : cnf.image[k][j]) {
 	  cout << " " << i << "(" << datanames[i] << ")";
 	}
 	cout << endl;
@@ -613,154 +571,4 @@ int main(int argc, char** argv) {
   }
   
   return 0;
-  /*
-  // prepare for image generation
-  if(pfilename.empty()) {
-    return 0;
-  }
-
-  // read placement file
-  ifstream pfile(pfilename);
-  if(!pfile) {
-    show_error("cannot open placement file");
-  }
-  vector<vector<string> > pl;
-  while(getline(pfile, str)) {
-    string s;
-    stringstream ss(str);
-    vector<string> vs;
-    while(getline(ss, s, ' ')) {
-      vs.push_back(s);
-    }
-    pl.push_back(vs);
-  }
-  pfile.close();
-
-  ifstream ofile(ofilename);
-  if(ofile) {
-    ofile.close();
-    string cmd = "rm -r " + ofilename;
-    system(cmd.c_str());
-  } 
-  else {
-    ofile.close();
-  }
-  string cmd = "mkdir " + ofilename;
-  system(cmd.c_str());
-
-  // generate image
-  double magnify = 1;
-  for(int i = 0; i < ncycles; i++) {
-    // generate dot file
-    ofstream df(dfilename);
-    df << "graph G {" << endl;
-    df << "node";
-    df << " [" << endl;
-    df << "shape=\"box\"";
-    df << "," << endl;
-    df << "fixedsize=true";
-    df << "," << endl;
-    df << "fontsize=10";
-    df << "," << endl;
-    df << "style=filled";
-    df << "," << endl;
-    df << "fillcolor=white";
-    df << "," << endl;
-    df << "labelloc=\"t\"";
-    df << endl;
-    df << "];" << endl;
-    df << endl;
-    int ftoolarge = 0;
-    for(auto line : pl) {
-      if(line.empty()) {
-	continue;
-      }
-      int id = node_name2id[line[0]];
-      assert(id);
-      float x = stof(line[1]) * magnify;
-      float y = stof(line[2]) * magnify;
-      float w = stof(line[3]) * magnify;
-      float h = stof(line[4]) * magnify;
-      string color;
-      if(line.size() > 5) {
-	color = line[5];
-      }
-      x = (x + w/2) * 72;
-      y = (y + h/2) * 72;
-      df << line[0];
-      df << " [" << endl;
-      df << "pos=\"" << x << "," << y << "\"";
-      df << "," << endl;
-      df << "width=" << w;
-      df << "," << endl;
-      df << "height=" << h;
-      df << "," << endl;
-      if(!color.empty()) {
-	df << "fillcolor=\"#" << color << "\"";
-	df << "," << endl;
-      }
-      if(gen.image[i][id].empty()) {
-	df << "label=\"\"";
-      } 
-      else {
-	df << "label=\"";
-	int j = 0;
-	int k = 0;
-	for(int l = 0; l < gen.image[i][id].size(); l++) {
-	  int d = gen.image[i][id][l]; 
-	  string dataname = datanames[d];
-	  for(char c : dataname) {
-	    if(j >= 14*w) {
-	      df << "\\l";
-	      j = 0;
-	      k++;
-	      if(k >= 6*h - 1) {
-		ftoolarge = 1;
-		break;
-	      }
-	    }
-	    df << c;
-	    j++;
-	  }
-	  df << "\\l";
-	  j = 0;
-	  k++;
-	  if(k >= 6*h - 1) {
-	    ftoolarge = 1;
-	    break;
-	  }
-	}
-	df << "\"";
-      }
-      if(ftoolarge) {
-	break;
-      }
-      df << endl;
-      df << "];" << endl;
-    }
-    df << "}" << endl;
-    df.close();
-    if(ftoolarge) {
-      magnify += 1;
-      i--;
-      continue;
-    }
-    // generate png file
-    string cmd = "neato " + dfilename + " -n -T png -o " + ofilename + "/out" + to_string(i) + ".png";
-    system(cmd.c_str());
-    magnify = 1;
-  }
-
-  string lfilename = ofilename + "/log.txt";
-  ofstream lfile(lfilename);
-  for(int i = 0; i < argc; i++) {
-    lfile << argv[i] << " ";
-  }
-  lfile << endl;
-  lfile.close();
-  
-  cout << "pngs are dumped at " << ofilename << endl;
-  
-  return 0;
-  */
 }

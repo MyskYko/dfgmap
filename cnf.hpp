@@ -1,21 +1,19 @@
-#ifndef GEN_HPP
-#define GEN_HPP
+#ifndef CNF_HPP
+#define CNF_HPP
 
 #include <string>
 #include <vector>
 #include <set>
 
-class Gen {
+class Cnf {
 public:
   std::vector<std::vector<std::vector<int> > > image;
 
-  Gen(std::vector<int> i_nodes, std::vector<int> o_nodes, std::vector<int> pe_nodes, std::vector<int> rom_nodes, std::set<std::pair<int, int> > &coms_, std::map<std::pair<int, int>, int> &com2band, int ninputs, std::set<int> output_ids, std::map<int, std::set<int> > assignments, std::vector<std::set<std::set<int> > > operands);
+  Cnf(std::vector<int> i_nodes, std::vector<int> o_nodes, std::vector<int> pe_nodes, std::vector<int> rom_nodes, std::set<std::pair<int, int> > &coms_, std::map<std::pair<int, int>, int> &com2band, int ninputs, std::set<int> output_ids, std::map<int, std::set<int> > assignments, std::vector<std::set<std::set<int> > > operands);
   
   void gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, std::string cnfname);
-  //  void gen_ilp(int ncycles, int nregs, int fexmem, std::string lpname);
   
   void gen_image(std::string rfilename);
-  //  void gen_image_ilp(std::string sfilename);
 
   void reduce_image();
 
@@ -47,4 +45,4 @@ private:
   int nc;
 };
 
-#endif // GEN_HPP
+#endif // CNF_HPP
