@@ -118,7 +118,7 @@ int main(int argc, char** argv) {
 	cout << "\t-m       : toggle using MAC operation [default = " << fmac << "]" << endl;
 	cout << "\t-x       : toggle using external memory to store intermediate data [default = " << fexmem << "]" << endl;
 	cout << "\t-t       : toggle incremental synthesis [default = " << finc << "]" << endl;
-	cout << "\t-r <int> : the number of registers in each PE (minus will be treated as no limit) [default = " << nregs << "]" << endl;
+	cout << "\t-r <int> : the number of registers in each PE (unspecified int is treated as no limit) [default = " << nregs << "]" << endl;
 	cout << "\t-s <int> : the number of cycles for pipeline [default = " << npipeline << "]" << endl;
 	cout << "\t-v <int> : toggle verbosing information [default = " << nverbose << "]" << endl;
 	cout << "\t           \t0 : nothing" << endl;
