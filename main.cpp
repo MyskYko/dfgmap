@@ -61,6 +61,12 @@ int main(int argc, char** argv) {
 	}
 	ffilename = argv[++i];
 	break;
+      case 'g':
+	if(i+1 >= argc) {
+	  show_error("-g must be followed by file name");
+	}
+	gfilename = argv[++i];
+	break;
       case 'c':
 	fcompress ^= 1;
 	break;
