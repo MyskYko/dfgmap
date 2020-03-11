@@ -438,22 +438,8 @@ int main(int argc, char** argv) {
     }
   }
   
-  /*  
   // instanciate problem generator
-  Cnf cnf = Cnf(i_nodes, o_nodes, pe_nodes, rom_nodes, coms, com2band, ninputs, output_ids, assignments, operands);
-  
-  if(fixout.size()) {
-    cnf.fixout.clear();
-    for(auto elem : fixout) {
-      int j = elem.first;
-      set<int> s;
-      for(auto p : elem.second) {
-	s.insert(p->id);
-      }
-      cnf.fixout[j] = s;
-    }
-  }
-  cnf.finitread = finitread;
+  Cnf cnf = Cnf(pe_nodes, mem_nodes, coms, ninputs, output_ids, assignments, operands);
 
   if(finc && ncycles < 1) {
     ncycles = 1;
@@ -511,6 +497,7 @@ int main(int argc, char** argv) {
     ncycles++;
   }
 
+  /*
   cnf.gen_image(rfilename);
 
   cnf.reduce_image();
@@ -529,5 +516,6 @@ int main(int argc, char** argv) {
     }
   }
   */
+
   return 0;
 }

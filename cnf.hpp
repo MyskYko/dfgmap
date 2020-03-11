@@ -4,21 +4,20 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <tuple>
 
 class Cnf {
 public:
   std::vector<std::vector<std::vector<int> > > image;
 
-  Cnf(std::vector<int> i_nodes, std::vector<int> o_nodes, std::vector<int> pe_nodes, std::vector<int> rom_nodes, std::set<std::pair<int, int> > &coms_, std::map<std::pair<int, int>, int> &com2band, int ninputs, std::set<int> output_ids, std::map<int, std::set<int> > assignments, std::vector<std::set<std::set<int> > > operands);
-  
-  void gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, std::string cnfname);
-  
+  Cnf(std::vector<int> pe_nodes, std::vector<int> mem_nodes, std::vector<std::tuple<std::vector<int>, std::vector<int>, int> > coms, int ninputs, std::set<int> output_ids, std::map<int, std::set<int> > assignments, std::vector<std::set<std::set<int> > > operands);
+
+  void gen_cnf(int ncycles, int nregs, int fextmem, int npipeline, std::string cnfname);
+  /*  
   void gen_image(std::string rfilename);
 
   void reduce_image();
-
-  std::map<int, std::set<int> > fixout;
-  int finitread;
+  */
   
 private:
   int nnodes;
@@ -26,20 +25,20 @@ private:
   int ninputs;
   int npes;
   int ncoms;
-  std::vector<int> i_nodes;
-  std::vector<int> o_nodes;
+
   std::vector<int> pe_nodes;
-  std::vector<int> rom_nodes;
-  std::vector<std::tuple<int, int, int> > coms;
+  std::vector<int> mem_nodes;
+  std::vector<std::tuple<std::vector<int>, std::vector<int>, int> > coms;
   std::set<int> output_ids;
   std::map<int, std::set<int> > assignments;
   std::vector<std::set<std::set<int> > > operands;
 
-  std::vector<std::set<int> > cons;
-  std::vector<std::set<int> > concoms;
+  std::vector<std::set<int> > outcoms;
+  std::vector<std::set<int> > incoms;
   
   int ncycles_;
-  int nc;
+  int yhead;
+  int zhead;
 };
 
 #endif // CNF_HPP

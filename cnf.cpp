@@ -8,76 +8,40 @@
 
 using namespace std;
 
-Cnf::Cnf(vector<int> i_nodes, vector<int> o_nodes, vector<int> pe_nodes, vector<int> rom_nodes, set<pair<int, int> > &coms_, map<pair<int, int>, int> &com2band, int ninputs, set<int> output_ids, map<int, set<int> > assignments, vector<set<set<int> > > operands) : i_nodes(i_nodes), o_nodes(o_nodes), pe_nodes(pe_nodes), rom_nodes(rom_nodes), ninputs(ninputs), output_ids(output_ids), assignments(assignments), operands(operands)
+Cnf::Cnf(vector<int> pe_nodes, vector<int> mem_nodes, vector<tuple<vector<int>, vector<int>, int> > coms, int ninputs, set<int> output_ids, map<int, set<int> > assignments, vector<set<set<int> > > operands) :pe_nodes(pe_nodes), mem_nodes(mem_nodes), coms(coms), ninputs(ninputs), output_ids(output_ids), assignments(assignments), operands(operands)
 {
-  nnodes = 1 + i_nodes.size() + o_nodes.size() + pe_nodes.size() + rom_nodes.size();
+  nnodes = pe_nodes.size() + mem_nodes.size();
   npes = pe_nodes.size();
   ndata = operands.size();
-  ncoms = 0;
-  cons.resize(nnodes);
-  concoms.resize(nnodes);
-  for(auto com : coms_) {
-    cons[com.second].insert(com.first);
-  }
-  for(int i : i_nodes) {
-    if(cons[i].size()) {
-      show_error("there is an input node with input");
+  ncoms = coms.size();
+  incoms.resize(nnodes);
+  outcoms.resize(nnodes);
+  for(int i = 0; i < ncoms; i++) {
+    for(int sender : get<0>(coms[i])) {
+      outcoms[sender].insert(i);
+    }
+    for(int recipient : get<1>(coms[i])) {
+      incoms[recipient].insert(i);
     }
   }
-  for(int i : rom_nodes) {
-    if(cons[i].size()) {
-      show_error("there is a ROM node with input");
-    }
-  }
-  for(int i : o_nodes) {
-    if(cons[i].empty()) {
-      show_error("there is an output node without input");
-    }	     
-    for(int con : cons[i]) {
-      if(find(pe_nodes.begin(), pe_nodes.end(), con) == pe_nodes.end()) {
-	show_error("there is a path from a non PE node to an output node");
-      }
-      if(com2band[make_pair(con, i)]) {
-	cout << "bandwidth of a path to an output node is ignored" << endl;
-      }
-    }
-  }
-  for(int i : pe_nodes) {
-    if(cons[i].empty()) {
-      show_error("there is a PE node without input");
-    }
-    for(int con : cons[i]) {
-      if(find(o_nodes.begin(), o_nodes.end(), con) != o_nodes.end()) {
-	show_error("there is a path from an output node to a PE node");
-      }
-    }
-    for(auto it = cons[i].begin(); it != cons[i].end();) {
-      auto com = make_pair(*it, i);
-      if(com2band[com]) {
-	concoms[i].insert(ncoms++);
-	coms.push_back(make_tuple(*it, i, com2band[com]));
-	it = cons[i].erase(it);
-      }
-      else {
-	it++;
-      }
-    }
-  }
-  /*
   for(int i : pe_nodes) {
     cout << i << " <- ";
-    for(int con : cons[i]) {
-      cout << con << ",";
+    for(int com : incoms[i]) {
+      cout << com << ",";
     }
-    for(int com : concoms[i]) {
-      cout << "c" << com << ",";
+    cout << " -> ";
+    for(int com : outcoms[i]) {
+      cout << com << ",";
     }
     cout << endl;
   }
-  for(auto com : coms) {
-    cout << get<0>(com) << " -> " << get<1>(com) << " : " << get<2>(com) << endl;
+}
+
+void write_clause(vector<int> &vLits, ofstream &f) {
+  for(int lit : vLits) {
+    f << lit << " ";
   }
-  */
+  f << 0 << endl;
 }
 
 void cardinality_am1(int &nvars, int &nclauses, vector<int> vVars, ofstream &fcnf) {
@@ -191,6 +155,173 @@ void cardinality_amk(int &nvars, int &nclauses, vector<int> vVars, ofstream &fcn
   }
 }
 
+void Cnf::gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, string cnfname) {
+  ncycles_ = ncycles;
+  if(!npipeline) {
+    npipeline = ncycles;
+  }
+  
+  ofstream fcnf(cnfname);
+  int nvars = ncycles * nnodes * ndata;
+  yhead = nvars;
+  nvars += ncycles * ncoms * ndata;
+  zhead = nvars;
+  nvars += ncycles * nnodes * ndata; // * nproc if not single core
+  int nclauses = 0;
+  
+  vector<int> vLits;
+
+  // init condition
+  fcnf << "c init condition" << endl;
+  for(int j = 0; j < nnodes; j++) {
+    for(int i = 0; i < ndata; i++) {
+      vLits.clear();
+      if(assignments.count(j) && assignments[j].count(i)) {
+	vLits.push_back(j*ndata + i + 1);
+      }
+      else {
+	vLits.push_back(-(j*ndata + i + 1));
+      }
+      write_clause(vLits, fcnf);
+      nclauses++;
+    }
+  }
+
+  // final condition
+  fcnf << "c final condition" << endl;
+  for(int i : output_ids) {
+    vLits.clear();
+    vLits.push_back((ncycles-1)*nnodes*ndata + i + 1);
+    write_clause(vLits, fcnf);
+    nclauses++;
+  }
+
+  // conditions for PE
+  fcnf << "c conditions for PE" << endl;
+  for(int k = 1; k < ncycles; k++) {
+    for(int j = 0; j < nnodes; j++) {
+      for(int i = 0; i < ndata; i++) {
+	vLits.clear();
+	vLits.push_back(-(k*nnodes*ndata + j*ndata + i + 1));
+	vLits.push_back((k-1)*nnodes*ndata + j*ndata + i + 1);
+	for(int h : incoms[j]) {
+	  vLits.push_back(yhead + k*ncoms*ndata + h*ndata + i + 1);
+	}
+	vLits.push_back(zhead + k*nnodes*ndata + j*ndata + i + 1);
+	write_clause(vLits, fcnf);
+	nclauses++;
+      }
+    }
+  }
+
+  // conditions for communication
+  fcnf << "c conditions for communication" << endl;
+  for(int k = 1; k < ncycles; k++) {
+    for(int h = 0; h < ncoms; h++) {
+      for(int i = 0; i < ndata; i++) {
+	vLits.clear();
+	vLits.push_back(-(yhead + k*ncoms*ndata + h*ndata + i + 1));
+	for(int j : get<0>(coms[h])) {
+	  vLits.push_back((k-1)*nnodes*ndata + j*ndata + i + 1);
+	}
+	write_clause(vLits, fcnf);
+	nclauses++;
+      }
+    }
+  }
+
+  // conditions for operation
+  fcnf << "c conditions for operation" << endl;
+  for(int k = 1; k < ncycles; k++) {
+    for(int j : pe_nodes) {
+      for(int i = 0; i < ndata; i++) {
+	for(auto s : operands[i]) {
+	  // TODO : generate a new variable for each set
+	  if(operands[i].size() != 1) { show_error("not 1 ope"); }
+	  for(int d : s) {
+	    vLits.clear();
+	    vLits.push_back(-(zhead + k*nnodes*ndata + j*ndata + i + 1));
+	    vLits.push_back((k-1)*nnodes*ndata + j*ndata + d + 1);
+	    for(int h : incoms[j]) {
+	      vLits.push_back(yhead + k*ncoms*ndata + h*ndata + d + 1);
+	    }
+	    write_clause(vLits, fcnf);
+	    nclauses++;
+	  }
+	}
+	// TODO : the variable -> OR of the new variables
+	if(operands[i].empty()) {
+	  vLits.clear();
+	  vLits.push_back(-(zhead + k*nnodes*ndata + j*ndata + i + 1));
+	  write_clause(vLits, fcnf);
+	  nclauses++;
+	}
+      }
+    }
+    for(int j : mem_nodes) {
+      for(int i = 0; i < ndata; i++) {
+	vLits.clear();
+	vLits.push_back(-(zhead + k*nnodes*ndata + j*ndata + i + 1));
+	write_clause(vLits, fcnf);
+	nclauses++;
+      }
+    }
+  }
+
+  // at most 1 or K
+  fcnf << "c at most 1 or K" << endl;
+  for(int t = 0; t < npipeline; t++) {
+    // reg
+    for(int j : pe_nodes) {
+      vLits.clear();
+      for(int k = t+1; k < ncycles; k += npipeline) {
+	for(int i = 0; i < ndata; i++) {
+	  vLits.push_back(k*nnodes*ndata + j*ndata + i + 1);
+	}
+      }
+      if(nregs == 1) {
+	cardinality_am1(nvars, nclauses, vLits, fcnf);
+      }
+      else {
+	cardinality_amk(nvars, nclauses, vLits, fcnf, nregs);
+      }
+    }
+    // com
+    for(int h = 0; h < ncoms; h++) {
+      vLits.clear();
+      for(int k = t+1; k < ncycles; k += npipeline) {
+	for(int i = 0; i < ndata; i++) {
+	  vLits.push_back(yhead + k*ncoms*ndata + h*ndata + i + 1);
+	}
+      }
+      int band = get<2>(coms[h]);
+      if(band == 1) {
+	cardinality_am1(nvars, nclauses, vLits, fcnf);	
+      }
+      else if(band > 0) {
+	cardinality_amk(nvars, nclauses, vLits, fcnf, band);
+      }
+    }
+    // ope
+    for(int j : pe_nodes) {
+      vLits.clear();
+      for(int k = t+1; k < ncycles; k += npipeline) {
+	for(int i = 0; i < ndata; i++) {
+	  vLits.push_back(zhead + k*nnodes*ndata + j*ndata + i + 1);
+	}
+      }
+      cardinality_am1(nvars, nclauses, vLits, fcnf); // branch if nproc used
+    }
+  }
+
+  fcnf.close();
+
+  string header = "p cnf " + to_string(nvars) + " " + to_string(nclauses);
+  string cmd = "sed -i \'1i" + header + "\' " + cnfname;
+  system(cmd.c_str());
+}
+
+/*
 void Cnf::gen_image(string rfilename) {
   vector<int> results;
   ifstream rfile(rfilename);
@@ -244,282 +375,9 @@ void Cnf::gen_image(string rfilename) {
     }
   }
 }
+*/
 
-void Cnf::gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, string cnfname) {
-  ncycles_ = ncycles;
-  if(!npipeline) {
-    npipeline = ncycles;
-  }
-  
-  ofstream fcnf(cnfname);
-  int nvars = ncycles * nnodes * ndata;
-  nc = nvars;
-  nvars += ncycles * ncoms * ndata;
-  int nclauses = 0;
-
-  // init condition
-  fcnf << "c init condition" << endl;
-  for(int j = 0; j < nnodes; j++) {
-    for(int i = 0; i < ndata; i++) {
-      if(assignments.count(j) && assignments[j].count(i)) {
-	fcnf << j*ndata + i + 1 << " ";
-	fcnf << 0 << endl; 
-	nclauses++;
-      }
-      else {
-	fcnf << "-" << j*ndata + i + 1 << " ";
-	fcnf << 0 << endl; 
-	nclauses++;
-      }
-    }
-  }
-  
-  // conditions for input nodes
-  fcnf << "c conditions for input nodes" << endl;
-  for(int k = 1; k < ncycles; k++) {
-    for(int j : i_nodes) {
-      for(int i = 0; i < ninputs; i++) {
-	fcnf << "-" << k*nnodes*ndata + j*ndata + i + 1 << " ";
-	fcnf << (k-1)*nnodes*ndata + i + 1 << " ";
-	fcnf << 0 << endl; 
-	nclauses++;
-      }
-      for(int i = ninputs; i < ndata; i++) {
-	fcnf << "-" << k*nnodes*ndata + j*ndata + i + 1 << " ";
-	if(fexmem) {
-	  fcnf << (k-1)*nnodes*ndata + i + 1 << " ";
-	}
-	fcnf << 0 << endl; 
-	nclauses++;
-      }
-    }
-  }
-
-  // conditions for external memory
-  fcnf << "c conditions for external memory" << endl;
-  for(int k = 1; k < ncycles; k++) {
-    for(int i = 0; i < ndata; i++) {
-      fcnf << "-" << k*nnodes*ndata + i + 1 << " ";
-      fcnf << (k-1)*nnodes*ndata + i + 1 << " ";
-      for(int j : o_nodes) {
-	fcnf << k*nnodes*ndata + j*ndata + i + 1 << " ";
-      }
-      fcnf << 0 << endl; 
-      nclauses++;
-    }
-  }
-
-  // conditions for operation and PE nodes
-  fcnf << "c conditions for operation and PE nodes" << endl;
-  vector<vector<vector<int> > > vz;
-  vz.resize(ncycles);
-  for(int k = 1; k < ncycles; k++) {
-    vz[k].resize(nnodes);
-    for(int j : pe_nodes) {
-      for(int i = 0; i < ndata; i++) {
-	// conditions for operation
-	vector<int> vVars;
-	for(auto d : operands[i]) {
-	  nvars++;
-	  for(int a : d) {
-	    fcnf << "-" << nvars << " ";
-	    fcnf << (k-1)*nnodes*ndata + j*ndata + a + 1 << " ";
-	    for(int con : cons[j]) {
-	      fcnf << (k-1)*nnodes*ndata + con*ndata + a + 1 << " ";
-	    }
-	    for(int com : concoms[j]) {
-	      fcnf << nc + (k-1)*ncoms*ndata + com*ndata + a + 1 << " ";
-	    }
-	    fcnf << 0 << endl;
-	    nclauses++;
-	  }
-	  vVars.push_back(nvars);
-	}
-	// conditions for PE nodes
-	fcnf << "-" << k*nnodes*ndata + j*ndata + i + 1 << " ";
-	fcnf << (k-1)*nnodes*ndata + j*ndata + i + 1 << " ";
-	for(int con : cons[j]) {
-	  fcnf << (k-1)*nnodes*ndata + con*ndata + i + 1 << " ";
-	}
-	for(int com : concoms[j]) {
-	  fcnf << nc + (k-1)*ncoms*ndata + com*ndata + i + 1 << " ";
-	}
-	for(int z : vVars) {
-	  fcnf << z << " ";
-	  vz[k][j].push_back(z);
-	}
-	fcnf << 0 << endl;
-	nclauses++;
-      }
-    }
-  }
-
-  // conditions for output nodes
-  fcnf << "c conditions for output nodes" << endl;
-  for(int k = 1; k < ncycles; k++) {
-    for(int j : o_nodes) {
-      for(int i = 0; i < ndata; i++) {
-	fcnf << "-" << k*nnodes*ndata + j*ndata + i + 1 << " ";
-	//	fcnf << (k-1)*nnodes*ndata + j*ndata + i + 1 << " ";
-	for(int con : cons[j]) {
-	  fcnf << (k-1)*nnodes*ndata + con*ndata + i + 1 << " ";
-	}
-	fcnf << 0 << endl;
-	nclauses++;
-      }
-    }
-  }
-
-  // conditions for ROM nodes
-  fcnf << "c conditions for ROM nodes" << endl;
-  for(int j : rom_nodes) {
-    for(int i = 0; i < ndata; i++) {
-      if(assignments.count(j) && assignments[j].count(i)) {
-	for(int k = 1; k < ncycles; k++) {
-	  fcnf << k*nnodes*ndata + j*ndata + i + 1 << " ";
-	  fcnf << 0 << endl;
-	  nclauses++;
-	}
-      }
-      else {
-	for(int k = 1; k < ncycles; k++) {
-	  fcnf << "-" << k*nnodes*ndata + j*ndata + i + 1 << " ";
-	  fcnf << 0 << endl; 
-	  nclauses++;
-	}
-      }
-    }
-  }
-
-  // conditions for communication
-  fcnf << "c conditions for communication" << endl;
-  for(int k = 0; k < ncycles; k++) {
-    for(int h = 0; h < ncoms; h++) {
-      for(int i = 0; i < ndata; i++) {
-	fcnf << "-" << nc + k*ncoms*ndata + h*ndata + i + 1 << " ";
-	int j = get<0>(coms[h]);
-	fcnf << k*nnodes*ndata + j*ndata + i + 1 << " ";
-	fcnf << 0 << endl;
-	nclauses++;
-      }
-    }
-  }
-
-  // at most 1 or K
-  fcnf << "c at most 1 or K" << endl;
-  for(int t = 0; t < npipeline; t++) {
-    for(int j : i_nodes) {
-      vector<int> vVars;
-      for(int k = t+1; k < ncycles; k += npipeline) {
-	for(int i = 0; i < ndata; i++) {
-	  vVars.push_back(k*nnodes*ndata + j*ndata + i + 1);
-	}
-      }
-      cardinality_am1(nvars, nclauses, vVars, fcnf);
-    }
-    for(int j : o_nodes) {
-      vector<int> vVars;
-      for(int k = t+1; k < ncycles; k += npipeline) {
-	for(int i = 0; i < ndata; i++) {
-	  vVars.push_back(k*nnodes*ndata + j*ndata + i + 1);
-	}
-      }
-      cardinality_am1(nvars, nclauses, vVars, fcnf);
-    }
-    for(int j : pe_nodes) {
-      vector<int> vVars;
-      for(int k = t+1; k < ncycles; k += npipeline) {
-	for(int i = 0; i < ndata; i++) {
-	  vVars.push_back(k*nnodes*ndata + j*ndata + i + 1);
-	}
-      }
-      if(nregs == 1) {
-	cardinality_am1(nvars, nclauses, vVars, fcnf);
-      }
-      else {
-	cardinality_amk(nvars, nclauses, vVars, fcnf, nregs);
-      }
-    }
-    for(int h = 0; h < ncoms; h++) {
-      vector<int> vVars;
-      for(int k = t; k < ncycles; k += npipeline) {
-	for(int i = 0; i < ndata; i++) {
-	  vVars.push_back(nc + k*ncoms*ndata + h*ndata + i + 1);
-	}
-      }
-      int band = get<2>(coms[h]);
-      if(band == 1) {
-	cardinality_am1(nvars, nclauses, vVars, fcnf);	
-      }
-      else {
-	cardinality_amk(nvars, nclauses, vVars, fcnf, band);
-      }
-    }
-    for(int j : pe_nodes) {
-      vector<int> vVars;
-      for(int k = t+1; k < ncycles; k += npipeline) {
-	for(int z : vz[k][j]) {
-	  vVars.push_back(z);
-	}
-      }
-      cardinality_am1(nvars, nclauses, vVars, fcnf);
-    }
-  }
-
-  // final condition
-  fcnf << "c final condition" << endl;
-  for(int i : output_ids) {
-    fcnf << (ncycles-1)*nnodes*ndata + i + 1 << " ";
-    fcnf << 0 << endl;
-    nclauses++;
-  }
-
-  // fixout
-  if(fixout.size()) {
-    fcnf << "c fixout" << endl;
-    for(int k = 0; k < ncycles; k++) {
-      for(auto elem : fixout) {
-	int j = elem.first;
-	for(int i = 0; i < ndata; i++) {
-	  if(elem.second.count(i)) {
-	    continue;
-	  }
-	  fcnf << "-" << k*nnodes*ndata + j*ndata + i + 1 << " ";
-	  fcnf << 0 << endl;
-	  nclauses++;
-	}
-      }
-    }
-  }
-  
-  // initread
-  if(finitread) {
-    fcnf << "c initread" << endl;
-    for(int i = 0; i < ndata; i++) {
-      vector<int> vVars;
-      for(int j : i_nodes) {
-	vVars.push_back(nnodes*ndata + j*ndata + i + 1);
-      }
-      cardinality_am1(nvars, nclauses, vVars, fcnf);
-    }
-    for(int k = 2; k < ncycles; k++) {
-      for(int j : i_nodes) {
-	for(int i = 0; i < ndata; i++) {
-	  fcnf << "-" << k*nnodes*ndata + j*ndata + i + 1 << " ";
-	  fcnf << 0 << endl;
-	  nclauses++;
-	}
-      }
-    }
-  }
-  
-  fcnf.close();
-
-  string header = "p cnf " + to_string(nvars) + " " + to_string(nclauses);
-  string cmd = "sed -i \'1i" + header + "\' " + cnfname;
-  system(cmd.c_str());
-}
-
+/*
 void Cnf::reduce_image() {
   vector<vector<vector<int> > > fimage(ncycles_, vector<vector<int> >(nnodes + ncoms));
   for(int k = 0; k < ncycles_; k++) {
@@ -849,3 +707,4 @@ void Cnf::reduce_image() {
     }
   }
 }
+*/
