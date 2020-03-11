@@ -99,13 +99,13 @@ void foreach_comb(int n, int k, std::function<void(int *)> f) {
   recursive_comb(indexes, n - 1, k, f);
 }
 
-void gen_operands(opnode *p, int &ndata, vector<set<set<int> > > &operands, map<pair<int, multiset<int> >, int> &unique, vector<string> &datanames, int fmac) {
+void gen_operands(opnode *p, int &ndata, vector<int> &optypes, vector<set<set<int> > > &operands, map<pair<int, multiset<int> >, int> &unique, vector<string> &datanames) {
   if(p->id != -1) {
     return;
   }
   multiset<int> cids;
   for(auto c : p->vc) {
-    gen_operands(c, ndata, operands, unique, datanames, fmac);
+    gen_operands(c, ndata, optypes, operands, unique, datanames);
     cids.insert(c->id);
   }
   pair<int, multiset<int> > key = make_pair(p->type, cids);
@@ -120,97 +120,106 @@ void gen_operands(opnode *p, int &ndata, vector<set<set<int> > > &operands, map<
 				     sub.insert(p->vc[indexes[k]]->id);
 				   }
 				   pair<int, multiset<int> > keysub = make_pair(p->type, sub);
-				   if(!unique[keysub]) {
-				     set<set<int> > ss;
-				     for(int j = 1; j < 1 << (i-1); j++) {
-				       set<int> s;
-				       int j_ = j;
-				       vector<opnode *> a;
-				       vector<opnode *> b;
-				       for(int k = 0; k < i; k++) {
-					 if(j_ % 2) {
-					   a.push_back(p->vc[indexes[k]]);
-					 } else {
-					   b.push_back(p->vc[indexes[k]]);
-					 }
-					 j_ = j_ >> 1;
-				       }
-				       multiset<int> as;
-				       for(auto q : a) {
-					 as.insert(q->id);
-				       }
-				       pair<int, multiset<int> > keya = make_pair(p->type, as);
-				       multiset<int> bs;
-				       for(auto q : b) {
-					 bs.insert(q->id);
-				       }
-				       pair<int, multiset<int> > keyb = make_pair(p->type, bs);
-				       if(a.size() == 1) {
-					 s.insert(a[0]->id);
-				       } else {
-					 s.insert(unique[keya]);
-				       }
-				       if(b.size() == 1) {
-					 s.insert(b[0]->id);
-				       } else {
-					 s.insert(unique[keyb]);
-				       }
-				       ss.insert(s);
-				       // MAC
-				       if(fmac) {
-					 if(a.size() == 1 && p->type == optype("+") && a[0]->type == optype("*")) {
-					   for(auto cs : operands[a[0]->id]) {
-					     assert(cs.size() == 2);
-					     s.clear();
-					     for(auto cc : cs) {
-					       s.insert(cc);
-					     }
-					     if(b.size() == 1) {
-					       s.insert(b[0]->id);
-					     } else {
-					       s.insert(unique[keyb]);
-					     }
-					     ss.insert(s);
-					   }
-					 }
-					 if(b.size() == 1 && p->type == optype("+") && b[0]->type == optype("*")) {
-					   for(auto cs : operands[b[0]->id]) {
-					     assert(cs.size() == 2);
-					     s.clear();
-					     for(auto cc : cs) {
-					       s.insert(cc);
-					     }
-					     if(a.size() == 1) {
-					       s.insert(a[0]->id);
-					     } else {
-					       s.insert(unique[keya]);
-					     }
-					     ss.insert(s);
-					   }
-					 }
-				       }
-				     }
-				     operands.push_back(ss);
-				     string dataname;
-				     for(auto id : sub) {
-				       dataname += datanames[id];
-				       dataname += " ";
-				       dataname += typeop(p->type);
-				       dataname += " ";
-				     }
-				     dataname.pop_back();
-				     dataname.pop_back();
-				     dataname.pop_back();
-				     datanames.push_back(dataname);
-				     unique[keysub] = ndata++;
+				   if(unique[keysub]) {
+				     return;
 				   }
+				   set<set<int> > ss;
+				   for(int j = 1; j < 1 << (i-1); j++) {
+				     set<int> s;
+				     int j_ = j;
+				     vector<opnode *> a;
+				     vector<opnode *> b;
+				     for(int k = 0; k < i; k++) {
+				       if(j_ % 2) {
+					 a.push_back(p->vc[indexes[k]]);
+				       } else {
+					 b.push_back(p->vc[indexes[k]]);
+				       }
+				       j_ = j_ >> 1;
+				     }
+				     multiset<int> as;
+				     for(auto q : a) {
+				       as.insert(q->id);
+				     }
+				     pair<int, multiset<int> > keya = make_pair(p->type, as);
+				     multiset<int> bs;
+				     for(auto q : b) {
+				       bs.insert(q->id);
+				     }
+				     pair<int, multiset<int> > keyb = make_pair(p->type, bs);
+				     if(a.size() == 1) {
+				       s.insert(a[0]->id);
+				     } else {
+				       s.insert(unique[keya]);
+				     }
+				     if(b.size() == 1) {
+				       s.insert(b[0]->id);
+				     } else {
+				       s.insert(unique[keyb]);
+				     }
+				     ss.insert(s);
+				   }
+				   optypes.push_back(p->type);
+				   operands.push_back(ss);
+				   string dataname;
+				   for(auto id : sub) {
+				     dataname += datanames[id];
+				     dataname += " ";
+				     dataname += typeop(p->type);
+				     dataname += " ";
+				   }
+				   dataname.pop_back();
+				   dataname.pop_back();
+				   dataname.pop_back();
+				   datanames.push_back(dataname);
+				   unique[keysub] = ndata++;
 				 });
   }
   p->id = unique[key];
 }
 
-/*
-void gen_operands(vector<set<set<int> > > &operands) {
-  
+void support_MAC(vector<int> &optypes, vector<set<set<int> > > &operands) {
+  assert(optypes.size() == operands.size());
+  int n = optypes.size();
+  vector<set<set<int> > > new_operands(n);
+  for(int i = 0; i < n; i++) {
+    if(optypes[i] != optype("+")) {
+      continue;
+    }
+    for(auto s : operands[i]) {
+      assert(s.size() == 2);
+      auto it = s.begin();
+      int a = *it;
+      it++;
+      int b = *it;
+      if(optypes[a] == optype("*")) {
+	for(auto cs : operands[a]) {
+	  assert(cs.size() == 2);
+	  set<int> new_s;
+	  for(auto cc : cs) {
+	    new_s.insert(cc);
+	  }
+	  new_s.insert(b);
+	  new_operands[i].insert(new_s);
+	}
+      }
+      if(optypes[b] == optype("*")) {
+	for(auto cs : operands[b]) {
+	  assert(cs.size() == 2);
+	  set<int> new_s;
+	  for(auto cc : cs) {
+	    new_s.insert(cc);
+	  }
+	  new_s.insert(a);
+	  new_operands[i].insert(new_s);
+	}
+      }      
+    }
+  }
+  for(int i = 0; i < n; i++) {
+    for(auto s : new_operands[i]) {
+      operands[i].insert(s);
+    }
+  }
 }
-*/
+

@@ -415,8 +415,11 @@ int main(int argc, char** argv) {
   map<pair<int, multiset<int> >, int> unique;
   set<int> output_ids;
   for(auto p : outputs) {
-    gen_operands(p, ndata, operands, unique, datanames, fmac);
+    gen_operands(p, ndata, optypes, operands, unique, datanames);
     output_ids.insert(p->id);
+  }
+  if(fmac) {
+    support_MAC(optypes, operands);
   }
   assert(ndata == operands.size());
 

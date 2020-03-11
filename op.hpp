@@ -19,6 +19,7 @@ std::string typeop(int i);
 opnode *create_opnode(std::vector<std::string> &vs, int &pos, std::map<std::string, opnode *> &data_name2opnode);
 void print_opnode(opnode * p, int depth);
 void compress_opnode(opnode * p);
-void gen_operands(opnode * p, int &ndata, std::vector<std::set<std::set<int> > > &operands, std::map<std::pair<int, std::multiset<int> >, int> &unique, std::vector<std::string> &datanames, int fmac);
+void gen_operands(opnode * p, int &ndata, std::vector<int> &optypes, std::vector<std::set<std::set<int> > > &operands, std::map<std::pair<int, std::multiset<int> >, int> &unique, std::vector<std::string> &datanames);
+void support_MAC(std::vector<int> &optypes, std::vector<std::set<std::set<int> > > &operands);
 
 #endif // OP_HPP
