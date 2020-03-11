@@ -208,3 +208,9 @@ void gen_operands(opnode *p, int &ndata, vector<set<set<int> > > &operands, map<
   }
   p->id = unique[key];
 }
+
+/*
+void gen_operands(vector<set<set<int> > > &operands) {
+  
+}
+*/

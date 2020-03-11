@@ -4,6 +4,7 @@
 #include <time.h>
 #include <cassert>
 #include <algorithm>
+#include <tuple>
 
 #include "global.hpp"
 #include "op.hpp"
@@ -25,9 +26,9 @@ int main(int argc, char** argv) {
   //string satcmd = "lingeling " + cfilename + " > " + rfilename;
   //string satcmd = "plingeling " + cfilename + " > " + rfilename;
   
-  int fcompress = 0;
+  int ftransform = 0;
   int fmac = 1;
-  int fexmem = 0;
+  int fextmem = 0;
   int finc = 0;
   int ncycles = 0;
   int nregs = 1;
@@ -68,13 +69,13 @@ int main(int argc, char** argv) {
 	gfilename = argv[++i];
 	break;
       case 'c':
-	fcompress ^= 1;
+	ftransform ^= 1;
 	break;
       case 'm':
 	fmac ^= 1;
 	break;
       case 'x':
-	fexmem ^= 1;
+	fextmem ^= 1;
 	break;
       case 't':
 	finc ^= 1;
@@ -120,9 +121,9 @@ int main(int argc, char** argv) {
 	cout << "\t-n <int> : the number of cycles [default = " << ncycles << "]" << endl;
 	cout << "\t-e <str> : the name of environment file [default = \"" << efilename << "\"]" << endl;
 	cout << "\t-f <str> : the name of formula file [default = \"" << ffilename << "\"]" << endl;
-	cout << "\t-c       : toggle transforming dataflow [default = " << fcompress << "]" << endl;
+	cout << "\t-c       : toggle transforming dataflow [default = " << ftransform << "]" << endl;
 	cout << "\t-m       : toggle using MAC operation [default = " << fmac << "]" << endl;
-	cout << "\t-x       : toggle using external memory to store intermediate data [default = " << fexmem << "]" << endl;
+	cout << "\t-x       : toggle using external memory to store intermediate data [default = " << fextmem << "]" << endl;
 	cout << "\t-t       : toggle incremental synthesis [default = " << finc << "]" << endl;
 	cout << "\t-r <int> : the number of registers in each PE (unspecified int is treated as no limit) [default = " << nregs << "]" << endl;
 	cout << "\t-s <int> : the number of cycles for pipeline [default = " << npipeline << "]" << endl;
@@ -142,14 +143,16 @@ int main(int argc, char** argv) {
   if(!efile) {
     show_error("cannot open environment file");
   }
+  int nnodes = 0;
   map<string, int> node_name2id;
-  int nnodes = 1; // external memory
-  vector<int> i_nodes;
-  vector<int> o_nodes;
   vector<int> pe_nodes;
-  vector<int> rom_nodes;
-  set<pair<int, int> > coms;
-  map<pair<int, int>, int> com2band;
+  vector<int> mem_nodes;
+  vector<tuple<vector<int>, vector<int>, int> > coms;
+  // external memory
+  string extmem_name = "_extmem";
+  node_name2id[extmem_name] = nnodes;
+  mem_nodes.push_back(nnodes);
+  nnodes++;
   string str;
   while(getline(efile, str)) {
     string s;
@@ -161,20 +164,6 @@ int main(int argc, char** argv) {
     if(vs.empty()) {
       continue;
     }
-    if(vs[0] == ".i") {
-      for(int i = 1; i < vs.size(); i++) {
-	node_name2id[vs[i]] = nnodes;
-	i_nodes.push_back(nnodes);
-	nnodes++;
-      }
-    }
-    if(vs[0] == ".o") {
-      for(int i = 1; i < vs.size(); i++) {
-	node_name2id[vs[i]] = nnodes;
-	o_nodes.push_back(nnodes);
-	nnodes++;
-      }
-    }
     if(vs[0] == ".pe") {
       for(int i = 1; i < vs.size(); i++) {
 	node_name2id[vs[i]] = nnodes;
@@ -182,10 +171,10 @@ int main(int argc, char** argv) {
 	nnodes++;
       }
     }
-    if(vs[0] == ".rom") {
+    if(vs[0] == ".mem") {
       for(int i = 1; i < vs.size(); i++) {
 	node_name2id[vs[i]] = nnodes;
-	rom_nodes.push_back(nnodes);
+	mem_nodes.push_back(nnodes);
 	nnodes++;
       }
     }
@@ -202,35 +191,42 @@ int main(int argc, char** argv) {
 	if(vs[0][0] == '.') {
 	  break;
 	}
-	if(vs.size() < 2) {
-	  show_error("specify the destination of a communication path from " + vs[0]);
+	int i = 0;
+	vector<int> senders;
+	while(i < vs.size() && vs[i] != "->") {
+	  if(!node_name2id.count(vs[i])) {
+	    show_error("node " + vs[i] + " unspecified");
+	  }
+	  senders.push_back(node_name2id[vs[i]]);
+	  i++;
 	}
-	int id0 = node_name2id[vs[0]];
-	if(!id0) {
-	  show_error("node " + vs[0] + " unspecified");
+	if(i == vs.size()) {
+	  show_error("there is an incomplete line in .com");
 	}
-	int id1 = node_name2id[vs[1]];
-	if(!id1) {
-	  show_error("node " + vs[1] + " unspecified");
+	i++;
+	vector<int> recipients;
+	while(i < vs.size() && vs[i] != ":") {
+	  if(!node_name2id.count(vs[i])) {
+	    show_error("node " + vs[i] + " unspecified");
+	  }
+	  recipients.push_back(node_name2id[vs[i]]);
+	  i++;
 	}
-	auto com = make_pair(id0, id1);
-	if(coms.count(com)) {
-	  show_error("communication path from " + vs[0] + " to " + vs[1] + " duplicated");  
-	}
-	coms.insert(com);
-	if(vs.size() == 3) {
-	  int band;
+	int band = -1;
+	if(vs[i] == ":") {
+	  i++;
+	  if(i == vs.size()) {
+	    show_error("there is an incomplete line in .com");
+	  }
 	  try {
-	    band = stoi(vs[2]);
+	    band = stoi(vs[i]);
 	  }
 	  catch(...) {
-	    show_error("non integer bandwidth of a communication path");
+	    show_error("bandwidth must be integer");
 	  }
-	  if(band <= 0) {
-	    show_error("bandwidth must be more than 0");
-	  }
-	  com2band[com] = band;
 	}
+	auto com = make_tuple(senders, recipients, band);
+	coms.push_back(com);
       }
     }
   }
@@ -238,36 +234,36 @@ int main(int argc, char** argv) {
   
   if(nverbose >= 2) {
     cout << "### environment information ###" << endl;
-    cout << "node name to id :" << endl;
+    cout << "id to node name :" << endl;
     for(auto i : node_name2id) {
-      cout << i.first << " -> " << i.second << endl;;
+      cout << i.second << " : " << i.first << endl;;
     }
-    cout << "inputs :" << endl;
-    for(int i : i_nodes) {
-      cout << i << ",";
-    }
-    cout << endl;
-    cout << "outputs :" << endl;
-    for(int i : o_nodes) {
-      cout << i << ",";
-    }
-    cout << endl;
     cout << "PEs :" << endl;
     for(int i : pe_nodes) {
       cout << i << ",";
     }
     cout << endl;
-    cout << "ROMs :" << endl;
-    for(int i : rom_nodes) {
+    cout << "Mems :" << endl;
+    for(int i : mem_nodes) {
       cout << i << ",";
     }
     cout << endl;
     cout << "communication paths :" << endl;
     for(auto com : coms) {
-      cout << com.first << " -> " << com.second << endl;
+      for(int i : get<0>(com)) {
+	cout << i << " ";
+      }
+      cout << "-> ";
+      for(int i : get<1>(com)) {
+	cout << i << " ";
+      }
+      if(get<2>(com) > 0) {
+	cout << ": " << get<2>(com);
+      }
+      cout << endl;
     }
   }
-  
+
   // read formula file
   ifstream ffile(ffilename);
   if(!ffile) {
@@ -330,8 +326,6 @@ int main(int argc, char** argv) {
   // read option file
   ifstream gfile(gfilename);
   map<int, set<int> > assignments;
-  map<int, set<opnode *> > fixout;
-  int finitread = 0;
   set<int> sinputs;
   for(int i = 0; i < ninputs; i++) {
     sinputs.insert(i);
@@ -364,72 +358,26 @@ int main(int argc, char** argv) {
 	  if(vs[0][0] == '.') {
 	    break;
 	  }
-	  if(vs[0] == "_memory") {
-	    sinputs.clear();
-	    for(int i = 1; i < vs.size(); i++) {
-	      opnode * p = data_name2opnode[vs[i]];
-	      if(!p) {
-		show_error("unspecified data " + vs[i] + " appears in option");
-	      }
-	      if(p->id == -1) {
-		show_error("data " + vs[i] + " is not input");
-	      }
-	      sinputs.insert(p->id);
-	    }
-	    assignments[0] = sinputs;
-	  }
-	  else {
-	    int id = node_name2id[vs[0]];
-	    if(!id) {
-	      show_error("node " + vs[0] + " does not exist");
-	    }
-	    if(find(rom_nodes.begin(), rom_nodes.end(), id) == rom_nodes.end()) {
-	      show_error("node " + vs[0] + " is not ROM");
-	    }
-	    sinputs.clear();
-	    for(int i = 1; i < vs.size(); i++) {
-	      opnode * p = data_name2opnode[vs[i]];
-	      if(!p) {
-		show_error("unspecified data " + vs[i] + " appears in option");
-	      }
-	      if(p->id == -1) {
-		show_error("data " + vs[i] + " is not input");
-	      }
-	      sinputs.insert(p->id);
-	    }
-	    assignments[id] = sinputs;
-	  }
-	}
-      }
-      if(vs[0] == ".fixout") {
-	while(getline(gfile, str)) {
-	  vs.clear();
-	  stringstream ss2(str);
-	  while(getline(ss2, s, ' ')) {
-	    vs.push_back(s);
-	  }
-	  if(vs.empty()) {
-	    continue;
-	  }
-	  if(vs[0][0] == '.') {
-	    break;
-	  }
-	  int id = node_name2id[vs[0]];
-	  if(!id) {
+	  if(!node_name2id.count(vs[0])) {
 	    show_error("node " + vs[0] + " does not exist");
 	  }
-	  set<opnode *> s;
-	  for(int i = 1; i < vs.size(); i++) {
-	    if(!data_name2opnode.count(vs[i])) {
-	      show_error("data " + vs[i] + " does not exist");
-	    }
-	    s.insert(data_name2opnode[vs[i]]);
+	  int id = node_name2id[vs[0]];
+	  if(find(mem_nodes.begin(), mem_nodes.end(), id) == mem_nodes.end()) {
+	    show_error("node " + vs[0] + " is not Mem");
 	  }
-	  fixout[id] = s;
+	  sinputs.clear();
+	  for(int i = 1; i < vs.size(); i++) {
+	    opnode * p = data_name2opnode[vs[i]];
+	    if(!p) {
+	      show_error("unspecified data " + vs[i] + " appears in option");
+	    }
+	    if(p->id == -1) {
+	      show_error("data " + vs[i] + " is not input");
+	    }
+	    sinputs.insert(p->id);
+	  }
+	  assignments[id] = sinputs;
 	}
-      }
-      if(vs[0] == ".initread") {
-	finitread = 1;
       }
     }
     
@@ -445,9 +393,9 @@ int main(int argc, char** argv) {
       }
     }
   }
-  
+
   // apply compression
-  if(fcompress) {
+  if(ftransform) {
     for(auto p : outputs) {
       compress_opnode(p);
       // notice : memory leaks here
@@ -462,6 +410,7 @@ int main(int argc, char** argv) {
 
   // generate operand list
   int ndata = ninputs;
+  vector<int> optypes(ndata);
   vector<set<set<int> > > operands(ndata);
   map<pair<int, multiset<int> >, int> unique;
   set<int> output_ids;
@@ -485,7 +434,8 @@ int main(int argc, char** argv) {
       d++;
     }
   }
-
+  
+  /*  
   // instanciate problem generator
   Cnf cnf = Cnf(i_nodes, o_nodes, pe_nodes, rom_nodes, coms, com2band, ninputs, output_ids, assignments, operands);
   
@@ -515,7 +465,7 @@ int main(int argc, char** argv) {
   while(1) {
     cout << "ncycles : " << ncycles << endl;
     int r = 0;
-    cnf.gen_cnf(ncycles, nregs, fexmem, npipeline, cfilename);
+    cnf.gen_cnf(ncycles, nregs, fextmem, npipeline, cfilename);
     system(satcmd.c_str());
     ifstream rfile(rfilename);
     if(!rfile) {
@@ -575,6 +525,6 @@ int main(int argc, char** argv) {
       }
     }
   }
-  
+  */
   return 0;
 }
