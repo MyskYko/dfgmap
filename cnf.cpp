@@ -59,6 +59,9 @@ void amo_naive(int &nclauses, vector<int> &vLits, ofstream &fcnf) {
 }
 
 void amo_bimander(int &nvars, int &nclauses, vector<int> &vLits, ofstream &fcnf, int nbim) {
+  if(vLits.size() <= 1) {
+    return;
+  }
   vector<int> vLits2;
   int m = vLits.size() / nbim + vLits.size() % nbim;
   int nb = integer_log2(m);
@@ -74,7 +77,7 @@ void amo_bimander(int &nvars, int &nclauses, vector<int> &vLits, ofstream &fcnf,
 	for(int j = 0; j < nbim && i*nbim + j < vLits.size(); j++) {
 	  vLits2.clear();
 	  vLits2.push_back(-vLits[i*nbim + j]);
-	  vLits2.push_back(nvars + j + 1);
+	  vLits2.push_back(nvars + k + 1);
 	  write_clause(nclauses, vLits2, fcnf);
 	}
       }
@@ -82,7 +85,7 @@ void amo_bimander(int &nvars, int &nclauses, vector<int> &vLits, ofstream &fcnf,
 	for(int j = 0; j < nbim && i*nbim + j < vLits.size(); j++) {
 	  vLits2.clear();
 	  vLits2.push_back(-vLits[i*nbim + j]);
-	  vLits2.push_back(-(nvars + j + 1));
+	  vLits2.push_back(-(nvars + k + 1));
 	  write_clause(nclauses, vLits2, fcnf);
 	}
       }
@@ -125,6 +128,9 @@ void amo_commander(int &nvars, int &nclauses, vector<int> vLits, ofstream &fcnf)
 
 void cardinality_amo(int &nvars, int &nclauses, vector<int> &vLits, ofstream &fcnf) {
   amo_commander(nvars, nclauses, vLits, fcnf);
+  // amo_naive(nclauses, vLits, fcnf);
+  // amo_bimander(nvars, nclauses, vLits, fcnf, 2);
+  // amo_bimander(nvars, nclauses, vLits, fcnf, integer_root(vLits.size()));
 }
 
 void cardinality_amk(int &nvars, int &nclauses, vector<int> vLits, ofstream &fcnf, int k) {

@@ -27,7 +27,7 @@ static void foreach_comb(int n, int k, std::function<void(int *)> f) {
   recursive_comb(indexes, n - 1, k, f);
 }
 
-static int integer_log2(int n) {
+static int integer_log2(int n) { // wrap up
   int t = 1;
   int count = 0;
   while(n > t) {
@@ -35,6 +35,31 @@ static int integer_log2(int n) {
     count++;
   }
   return count;
+}
+
+static int integer_root(int n) { // wrap down
+  if(n == 1) {
+    return 1;
+  }
+  int s = n * n;
+  int l = n/2;
+  int r = n;
+  while(r > l + 1) {
+    int m = (l + r) / 2;
+    if(m * m > s) {
+      r = m;
+    }
+    else if(m * m < s) {
+      l = m;
+    }
+    else {
+      return m;
+    }
+  }
+  if(r * r == s) {
+    return r;  
+  }
+  return l;
 }
 
 #endif // GLOBAL_HPP
