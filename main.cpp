@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
   string rfilename = "_test.out";
   string dfilename = "_out.dot";
   string ofilename = "out" + to_string(time(NULL));
-  string satcmd = "minisat " + cfilename + " " + rfilename;
+  string satcmd = "minisat -rnd-init " + cfilename + " " + rfilename;
   //string satcmd = "glucose " + cfilename + " " + rfilename;
   //string satcmd = "lingeling " + cfilename + " > " + rfilename;
   //string satcmd = "plingeling " + cfilename + " > " + rfilename;
@@ -30,6 +30,7 @@ int main(int argc, char** argv) {
   int fmac = 0;
   int fextmem = 0;
   int finc = 0;
+  int filp = 0;
   int ncycles = 0;
   int nregs = 1;
   int npipeline = 0;
@@ -80,6 +81,9 @@ int main(int argc, char** argv) {
       case 't':
 	finc ^= 1;
 	break;
+      case 'i':
+	filp ^= 1;
+	break;
       case 'r':
 	if(i+1 >= argc || argv[i+1][0] == '-') {
 	  nregs = -1;
@@ -125,6 +129,7 @@ int main(int argc, char** argv) {
 	cout << "\t-m       : toggle using MAC operation [default = " << fmac << "]" << endl;
 	cout << "\t-x       : toggle using external memory to store intermediate data [default = " << fextmem << "]" << endl;
 	cout << "\t-t       : toggle incremental synthesis [default = " << finc << "]" << endl;
+	cout << "\t-i       : toggle ilp [default = " << filp << "]" << endl;
 	cout << "\t-r <int> : the number of registers in each PE (unspecified int is treated as no limit) [default = " << nregs << "]" << endl;
 	cout << "\t-s <int> : the number of cycles for pipeline [default = " << npipeline << "]" << endl;
 	cout << "\t-v <int> : toggle verbosing information [default = " << nverbose << "]" << endl;
@@ -440,7 +445,11 @@ int main(int argc, char** argv) {
   
   // instanciate problem generator
   Cnf cnf = Cnf(pe_nodes, mem_nodes, coms, ninputs, output_ids, assignments, operands);
-
+  if(filp) {
+    cnf.filp = 1;
+    cfilename = "_test.lp";
+  }
+  
   if(finc && ncycles < 1) {
     ncycles = 1;
   }
@@ -453,9 +462,12 @@ int main(int argc, char** argv) {
 
   while(1) {
     cout << "ncycles : " << ncycles << endl;
-    int r = 0;
     cnf.gen_cnf(ncycles, nregs, fextmem, npipeline, cfilename);
+    if(filp) {
+      return 0;
+    }
     system(satcmd.c_str());
+    int r = 0;
     ifstream rfile(rfilename);
     if(!rfile) {
       show_error("cannot open result file");

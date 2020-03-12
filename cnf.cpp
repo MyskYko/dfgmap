@@ -10,8 +10,8 @@ using namespace std;
 
 Cnf::Cnf(vector<int> pe_nodes, vector<int> mem_nodes, vector<tuple<vector<int>, vector<int>, int> > coms, int ninputs, set<int> output_ids, map<int, set<int> > assignments, vector<set<set<int> > > operands) :pe_nodes(pe_nodes), mem_nodes(mem_nodes), coms(coms), ninputs(ninputs), output_ids(output_ids), assignments(assignments), operands(operands)
 {
+  filp = 0;
   nnodes = pe_nodes.size() + mem_nodes.size();
-  npes = pe_nodes.size();
   ndata = operands.size();
   ncoms = coms.size();
   incoms.resize(nnodes);
@@ -37,18 +37,28 @@ Cnf::Cnf(vector<int> pe_nodes, vector<int> mem_nodes, vector<tuple<vector<int>, 
   }
 }
 
-void write_clause(int &nclauses, vector<int> &vLits, ofstream &f) {
-  for(int lit : vLits) {
-    f << lit << " ";
+void Cnf::write_clause(int &nclauses, vector<int> &vLits, ofstream &fcnf) {
+  if(filp) {
+    int c = 1;
+    for(int lit : vLits) {
+      if(lit < 0) {
+	fcnf << "-";
+	c--;
+      }
+      fcnf << "x" << abs(lit) << " + ";
+    }
+    fcnf.seekp(-2, ios::cur);
+    fcnf << ">= " << c << endl;
+    return;
   }
-  f << 0 << endl;
+  for(int lit : vLits) {
+    fcnf << lit << " ";
+  }
+  fcnf << 0 << endl;
   nclauses++;
 }
 
-void amo_naive(int &nclauses, vector<int> &vLits, ofstream &fcnf) {
-  if(vLits.size() <= 1) {
-    return;
-  }
+void Cnf::amo_naive(int &nclauses, vector<int> &vLits, ofstream &fcnf) {
   vector<int> vLits2;
   foreach_comb(vLits.size(), 2, [&](int *indexes) {
 				  vLits2.clear();
@@ -58,10 +68,9 @@ void amo_naive(int &nclauses, vector<int> &vLits, ofstream &fcnf) {
 				});
 }
 
-void amo_bimander(int &nvars, int &nclauses, vector<int> &vLits, ofstream &fcnf, int nbim) {
-  if(vLits.size() <= 1) {
-    return;
-  }
+
+
+void Cnf::amo_bimander(int &nvars, int &nclauses, vector<int> &vLits, ofstream &fcnf, int nbim) {
   vector<int> vLits2;
   int m = vLits.size() / nbim + vLits.size() % nbim;
   int nb = integer_log2(m);
@@ -70,7 +79,9 @@ void amo_bimander(int &nvars, int &nclauses, vector<int> &vLits, ofstream &fcnf,
     for(int j = 0; j < nbim && i*nbim + j < vLits.size(); j++) {
       vLits2.push_back(vLits[i*nbim + j]);
     }
-    amo_naive(nclauses, vLits2, fcnf);
+    if(vLits2.size() > 1) {
+      amo_naive(nclauses, vLits2, fcnf);
+    }
     for(int k = 0; k < nb; k++) {
       int b = 1 << k;
       if(i & b) {
@@ -94,7 +105,7 @@ void amo_bimander(int &nvars, int &nclauses, vector<int> &vLits, ofstream &fcnf,
   nvars += nb;
 }
 
-void amo_commander(int &nvars, int &nclauses, vector<int> vLits, ofstream &fcnf) {
+void Cnf::amo_commander(int &nvars, int &nclauses, vector<int> vLits, ofstream &fcnf) {
   vector<int> vLits2;
   while(vLits.size() > 1) {
     int k = 0;
@@ -126,15 +137,45 @@ void amo_commander(int &nvars, int &nclauses, vector<int> vLits, ofstream &fcnf)
   }
 }
 
-void cardinality_amo(int &nvars, int &nclauses, vector<int> &vLits, ofstream &fcnf) {
+void Cnf::cardinality_amo(int &nvars, int &nclauses, vector<int> &vLits, ofstream &fcnf) {
+  if(vLits.size() <= 1) {
+    return;
+  }
+  if(filp) {
+    int c = 1;
+    for(int lit : vLits) {
+      if(lit < 0) {
+	fcnf << "-";
+	c--;
+      }
+      fcnf << "x" << abs(lit) << " + ";
+    }
+    fcnf.seekp(-2, ios::cur);
+    fcnf << "<= " << c << endl;
+    return;
+  }
   amo_commander(nvars, nclauses, vLits, fcnf);
   // amo_naive(nclauses, vLits, fcnf);
+  // amo_bimander(nvars, nclauses, vLits, fcnf, 1); // binary
   // amo_bimander(nvars, nclauses, vLits, fcnf, 2);
   // amo_bimander(nvars, nclauses, vLits, fcnf, integer_root(vLits.size()));
 }
 
-void cardinality_amk(int &nvars, int &nclauses, vector<int> vLits, ofstream &fcnf, int k) {
-  if(vLits.empty()) {
+void Cnf::cardinality_amk(int &nvars, int &nclauses, vector<int> vLits, ofstream &fcnf, int k) {
+  if(vLits.size() <= k) {
+    return;
+  }
+  if(filp) {
+    int c = k;
+    for(int lit : vLits) {
+      if(lit < 0) {
+	fcnf << "-";
+	c--;
+      }
+      fcnf << "x" << abs(lit) << " + ";
+    }
+    fcnf.seekp(-2, ios::cur);
+    fcnf << "<= " << c << endl;
     return;
   }
   vector<int> vCounts;
@@ -220,7 +261,6 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fextmem, int npipeline, string cnf
     npipeline = ncycles;
   }
   
-  ofstream fcnf(cnfname);
   int nvars = ncycles * nnodes * ndata;
   yhead = nvars;
   nvars += ncycles * ncoms * ndata;
@@ -228,10 +268,16 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fextmem, int npipeline, string cnf
   nvars += ncycles * nnodes * ndata; // * nproc if not single core
   int nclauses = 0;
   
+  ofstream fcnf(cnfname);
   vector<int> vLits;
+
+  if(filp) {
+    fcnf << "minimize" << endl;
+    fcnf << "subject to" << endl;
+  }
   
   // init condition
-  fcnf << "c init condition" << endl;
+  fcnf << (filp? "\\": "c") << " init condition" << endl;
   for(int j = 0; j < nnodes; j++) {
     for(int i = 0; i < ndata; i++) {
       vLits.clear();
@@ -246,7 +292,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fextmem, int npipeline, string cnf
   }
 
   // final condition
-  fcnf << "c final condition" << endl;
+  fcnf << (filp? "\\": "c") << " final condition" << endl;
   for(int i : output_ids) {
     vLits.clear();
     vLits.push_back((ncycles-1)*nnodes*ndata + i + 1);
@@ -254,7 +300,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fextmem, int npipeline, string cnf
   }
 
   // conditions for PE
-  fcnf << "c conditions for PE" << endl;
+  fcnf << (filp? "\\": "c") << " conditions for PE" << endl;
   for(int k = 1; k < ncycles; k++) {
     for(int j = 0; j < nnodes; j++) {
       for(int i = 0; i < ndata; i++) {
@@ -271,7 +317,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fextmem, int npipeline, string cnf
   }
 
   // conditions for communication
-  fcnf << "c conditions for communication" << endl;
+  fcnf << (filp? "\\": "c") << " conditions for communication" << endl;
   for(int k = 1; k < ncycles; k++) {
     for(int h = 0; h < ncoms; h++) {
       for(int i = 0; i < ndata; i++) {
@@ -286,7 +332,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fextmem, int npipeline, string cnf
   }
 
   // conditions for operation
-  fcnf << "c conditions for operation" << endl;
+  fcnf << (filp? "\\": "c") << " conditions for operation" << endl;
   for(int k = 1; k < ncycles; k++) {
     for(int j : pe_nodes) {
       for(int i = 0; i < ndata; i++) {
@@ -321,7 +367,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fextmem, int npipeline, string cnf
   }
 
   // at most 1 or K
-  fcnf << "c at most 1 or K" << endl;
+  fcnf << (filp? "\\": "c") << " at most 1 or K" << endl;
   for(int t = 0; t < npipeline; t++) {
     // reg
     for(int j : pe_nodes) {
@@ -368,7 +414,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fextmem, int npipeline, string cnf
 
   // option
   if(!fextmem) {
-    fcnf << "c not fextmem" << endl;
+    fcnf << (filp? "\\": "c") << " not fextmem" << endl;
     for(int k = 0; k < ncycles; k++) {
       for(int i = ninputs; i < ndata; i++) {
 	if(find(output_ids.begin(), output_ids.end(), i) == output_ids.end()) {
@@ -392,9 +438,20 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fextmem, int npipeline, string cnf
       }
     }
   }
+
+  if(filp) {
+    fcnf << "binary" << endl;
+    for(int i = 0; i < nvars; i++) {
+      fcnf << "x" << i+1 << endl;
+    }
+    fcnf << "end" << endl;
+  }
   
   fcnf.close();
 
+  if(filp) {
+    return;
+  }
   string header = "p cnf " + to_string(nvars) + " " + to_string(nclauses);
   string cmd = "sed -i \'1i" + header + "\' " + cnfname;
   system(cmd.c_str());
