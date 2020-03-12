@@ -37,51 +37,103 @@ Cnf::Cnf(vector<int> pe_nodes, vector<int> mem_nodes, vector<tuple<vector<int>, 
   }
 }
 
-void write_clause(vector<int> &vLits, ofstream &f) {
+void write_clause(int &nclauses, vector<int> &vLits, ofstream &f) {
   for(int lit : vLits) {
     f << lit << " ";
   }
   f << 0 << endl;
+  nclauses++;
 }
 
-void cardinality_am1(int &nvars, int &nclauses, vector<int> vVars, ofstream &fcnf) {
-  while(vVars.size() > 1) {
+void amo_naive(int &nclauses, vector<int> &vLits, ofstream &fcnf) {
+  if(vLits.size() <= 1) {
+    return;
+  }
+  vector<int> vLits2;
+  foreach_comb(vLits.size(), 2, [&](int *indexes) {
+				  vLits2.clear();
+				  vLits2.push_back(-vLits[indexes[0]]);
+				  vLits2.push_back(-vLits[indexes[1]]);
+				  write_clause(nclauses, vLits2, fcnf);
+				});
+}
+
+void amo_bimander(int &nvars, int &nclauses, vector<int> &vLits, ofstream &fcnf, int nbim) {
+  vector<int> vLits2;
+  int m = vLits.size() / nbim + vLits.size() % nbim;
+  int nb = integer_log2(m);
+  for(int i = 0; i < m; i++) {
+    vLits2.clear();
+    for(int j = 0; j < nbim && i*nbim + j < vLits.size(); j++) {
+      vLits2.push_back(vLits[i*nbim + j]);
+    }
+    amo_naive(nclauses, vLits2, fcnf);
+    for(int k = 0; k < nb; k++) {
+      int b = 1 << k;
+      if(i & b) {
+	for(int j = 0; j < nbim && i*nbim + j < vLits.size(); j++) {
+	  vLits2.clear();
+	  vLits2.push_back(-vLits[i*nbim + j]);
+	  vLits2.push_back(nvars + j + 1);
+	  write_clause(nclauses, vLits2, fcnf);
+	}
+      }
+      else {
+	for(int j = 0; j < nbim && i*nbim + j < vLits.size(); j++) {
+	  vLits2.clear();
+	  vLits2.push_back(-vLits[i*nbim + j]);
+	  vLits2.push_back(-(nvars + j + 1));
+	  write_clause(nclauses, vLits2, fcnf);
+	}
+      }
+    }
+  }
+  nvars += nb;
+}
+
+void amo_commander(int &nvars, int &nclauses, vector<int> vLits, ofstream &fcnf) {
+  vector<int> vLits2;
+  while(vLits.size() > 1) {
     int k = 0;
-    for(int j = 0; j < vVars.size()/2; j++) {
+    for(int j = 0; j < vLits.size()/2; j++) {
       nvars++;
-      fcnf << "-" << vVars[2*j] << " ";
-      fcnf << "-" << vVars[2*j+1] << " ";
-      fcnf << 0 << endl;
-      nclauses++;
-      fcnf << "-" << nvars << " ";
-      fcnf << vVars[2*j] << " ";
-      fcnf << vVars[2*j+1] << " ";
-      fcnf << 0 << endl;
-      nclauses++;
-      fcnf << nvars << " ";
-      fcnf << "-" << vVars[2*j] << " ";
-      fcnf << 0 << endl;
-      nclauses++;
-      fcnf << nvars << " ";
-      fcnf << "-" << vVars[2*j+1] << " ";
-      fcnf << 0 << endl;
-      nclauses++;
-      vVars[k++] = nvars;
+      vLits2.clear();
+      vLits2.push_back(-vLits[2*j]);
+      vLits2.push_back(-vLits[2*j+1]);
+      write_clause(nclauses, vLits2, fcnf);
+      vLits2.clear();
+      vLits2.push_back(-nvars);
+      vLits2.push_back(vLits[2*j]);
+      vLits2.push_back(vLits[2*j+1]);
+      write_clause(nclauses, vLits2, fcnf);
+      vLits2.clear();
+      vLits2.push_back(nvars);
+      vLits2.push_back(-vLits[2*j]);
+      write_clause(nclauses, vLits2, fcnf);
+      vLits2.clear();
+      vLits2.push_back(nvars);
+      vLits2.push_back(-vLits[2*j+1]);
+      write_clause(nclauses, vLits2, fcnf);      
+      vLits[k++] = nvars;
     }
-    if(vVars.size()%2) {
-      vVars[k++] = vVars.back();
+    if(vLits.size()%2) {
+      vLits[k++] = vLits.back();
     }
-    vVars.resize(k);
+    vLits.resize(k);
   }
 }
 
-void cardinality_amk(int &nvars, int &nclauses, vector<int> vVars, ofstream &fcnf, int k) {
-  if(vVars.empty()) {
+void cardinality_amo(int &nvars, int &nclauses, vector<int> &vLits, ofstream &fcnf) {
+  amo_commander(nvars, nclauses, vLits, fcnf);
+}
+
+void cardinality_amk(int &nvars, int &nclauses, vector<int> vLits, ofstream &fcnf, int k) {
+  if(vLits.empty()) {
     return;
   }
   vector<int> vCounts;
   // first level
-  vCounts.push_back(vVars[0]);
+  vCounts.push_back(vLits[0]);
   nvars++;
   fcnf << "-" << nvars << " ";
   fcnf << 0 << endl;
@@ -90,14 +142,14 @@ void cardinality_amk(int &nvars, int &nclauses, vector<int> vVars, ofstream &fcn
     vCounts.push_back(nvars);
   }
   // subsequent levels
-  for(int j = 1; j < vVars.size(); j++) {
-    int x = vVars[j];
+  for(int j = 1; j < vLits.size(); j++) {
+    int x = vLits[j];
     // prohibit overflow (sum>k)
     fcnf << "-" << vCounts[k-1] << " ";
     fcnf << "-" << x << " ";
     fcnf << 0 << endl;
     nclauses++;
-    if(j == vVars.size()-1) {
+    if(j == vLits.size()-1) {
       break;
     }
     for(int i = k-1; i > 0; i--) {
@@ -170,7 +222,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, string cnfn
   int nclauses = 0;
   
   vector<int> vLits;
-
+  
   // init condition
   fcnf << "c init condition" << endl;
   for(int j = 0; j < nnodes; j++) {
@@ -182,8 +234,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, string cnfn
       else {
 	vLits.push_back(-(j*ndata + i + 1));
       }
-      write_clause(vLits, fcnf);
-      nclauses++;
+      write_clause(nclauses, vLits, fcnf);
     }
   }
 
@@ -192,8 +243,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, string cnfn
   for(int i : output_ids) {
     vLits.clear();
     vLits.push_back((ncycles-1)*nnodes*ndata + i + 1);
-    write_clause(vLits, fcnf);
-    nclauses++;
+    write_clause(nclauses, vLits, fcnf);
   }
 
   // conditions for PE
@@ -208,8 +258,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, string cnfn
 	  vLits.push_back(yhead + k*ncoms*ndata + h*ndata + i + 1);
 	}
 	vLits.push_back(zhead + k*nnodes*ndata + j*ndata + i + 1);
-	write_clause(vLits, fcnf);
-	nclauses++;
+	write_clause(nclauses, vLits, fcnf);
       }
     }
   }
@@ -224,8 +273,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, string cnfn
 	for(int j : get<0>(coms[h])) {
 	  vLits.push_back((k-1)*nnodes*ndata + j*ndata + i + 1);
 	}
-	write_clause(vLits, fcnf);
-	nclauses++;
+	write_clause(nclauses, vLits, fcnf);
       }
     }
   }
@@ -245,16 +293,14 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, string cnfn
 	    for(int h : incoms[j]) {
 	      vLits.push_back(yhead + k*ncoms*ndata + h*ndata + d + 1);
 	    }
-	    write_clause(vLits, fcnf);
-	    nclauses++;
+	    write_clause(nclauses, vLits, fcnf);
 	  }
 	}
 	// TODO : the variable -> OR of the new variables
 	if(operands[i].empty()) {
 	  vLits.clear();
 	  vLits.push_back(-(zhead + k*nnodes*ndata + j*ndata + i + 1));
-	  write_clause(vLits, fcnf);
-	  nclauses++;
+	  write_clause(nclauses, vLits, fcnf);
 	}
       }
     }
@@ -262,8 +308,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, string cnfn
       for(int i = 0; i < ndata; i++) {
 	vLits.clear();
 	vLits.push_back(-(zhead + k*nnodes*ndata + j*ndata + i + 1));
-	write_clause(vLits, fcnf);
-	nclauses++;
+	write_clause(nclauses, vLits, fcnf);
       }
     }
   }
@@ -280,7 +325,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, string cnfn
 	}
       }
       if(nregs == 1) {
-	cardinality_am1(nvars, nclauses, vLits, fcnf);
+	cardinality_amo(nvars, nclauses, vLits, fcnf);
       }
       else {
 	cardinality_amk(nvars, nclauses, vLits, fcnf, nregs);
@@ -296,7 +341,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, string cnfn
       }
       int band = get<2>(coms[h]);
       if(band == 1) {
-	cardinality_am1(nvars, nclauses, vLits, fcnf);	
+	cardinality_amo(nvars, nclauses, vLits, fcnf);	
       }
       else if(band > 0) {
 	cardinality_amk(nvars, nclauses, vLits, fcnf, band);
@@ -310,7 +355,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, string cnfn
 	  vLits.push_back(zhead + k*nnodes*ndata + j*ndata + i + 1);
 	}
       }
-      cardinality_am1(nvars, nclauses, vLits, fcnf); // branch if nproc used
+      cardinality_amo(nvars, nclauses, vLits, fcnf); // branch if nproc used
     }
   }
 

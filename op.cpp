@@ -1,4 +1,3 @@
-#include <functional>
 #include <cassert>
 
 #include "op.hpp"
@@ -81,22 +80,6 @@ void compress_opnode(opnode *p) {
   for(auto c : p->vc) {
     compress_opnode(c);
   }
-}
-
-void recursive_comb(int *indexes, int s, int rest, std::function<void(int *)> f) {
-  if (rest == 0) {
-    f(indexes);
-  } else {
-    if (s < 0) return;
-    recursive_comb(indexes, s - 1, rest, f);
-    indexes[rest - 1] = s;
-    recursive_comb(indexes, s - 1, rest - 1, f);
-  }
-}
-
-void foreach_comb(int n, int k, std::function<void(int *)> f) {
-  int indexes[k];
-  recursive_comb(indexes, n - 1, k, f);
 }
 
 void gen_operands(opnode *p, int &ndata, vector<int> &optypes, vector<set<set<int> > > &operands, map<pair<int, multiset<int> >, int> &unique, vector<string> &datanames) {

@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
   //string satcmd = "plingeling " + cfilename + " > " + rfilename;
   
   int ftransform = 0;
-  int fmac = 1;
+  int fmac = 0;
   int fextmem = 0;
   int finc = 0;
   int ncycles = 0;
