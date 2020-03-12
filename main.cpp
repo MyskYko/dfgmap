@@ -497,10 +497,9 @@ int main(int argc, char** argv) {
     ncycles++;
   }
 
-  /*
   cnf.gen_image(rfilename);
 
-  cnf.reduce_image();
+  //  cnf.reduce_image();
   
   if(nverbose) {
     cout << "### results ###" << endl;
@@ -515,7 +514,6 @@ int main(int argc, char** argv) {
       }
     }
   }
-  */
 
   return 0;
 }

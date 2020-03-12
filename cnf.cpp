@@ -132,12 +132,13 @@ void cardinality_amk(int &nvars, int &nclauses, vector<int> vLits, ofstream &fcn
     return;
   }
   vector<int> vCounts;
+  vector<int> vLits2;
   // first level
   vCounts.push_back(vLits[0]);
   nvars++;
-  fcnf << "-" << nvars << " ";
-  fcnf << 0 << endl;
-  nclauses++;
+  vLits2.clear();
+  vLits2.push_back(-nvars);
+  write_clause(nclauses, vLits2, fcnf);
   for(int i = 1; i < k; i++) {
     vCounts.push_back(nvars);
   }
@@ -145,69 +146,69 @@ void cardinality_amk(int &nvars, int &nclauses, vector<int> vLits, ofstream &fcn
   for(int j = 1; j < vLits.size(); j++) {
     int x = vLits[j];
     // prohibit overflow (sum>k)
-    fcnf << "-" << vCounts[k-1] << " ";
-    fcnf << "-" << x << " ";
-    fcnf << 0 << endl;
-    nclauses++;
+    vLits2.clear();
+    vLits2.push_back(-vCounts[k-1]);
+    vLits2.push_back(-x);
+    write_clause(nclauses, vLits2, fcnf);
     if(j == vLits.size()-1) {
       break;
     }
     for(int i = k-1; i > 0; i--) {
-      // compute AND of x and l-1 of previous level
+      // compute AND of x and i-1 of previous level
       nvars++;
       int a = nvars;
-      fcnf << "-" << a << " ";
-      fcnf << x << " ";
-      fcnf << 0 << endl;
-      nclauses++;
-      fcnf << "-" << a << " ";
-      fcnf << vCounts[i-1] << " ";
-      fcnf << 0 << endl;
-      nclauses++;
-      fcnf << a << " ";
-      fcnf << "-" << x << " ";
-      fcnf << "-" << vCounts[i-1] << " ";
-      fcnf << 0 << endl;
-      nclauses++;
-      // compute OR of it and l of previous level
+      vLits2.clear();
+      vLits2.push_back(-a);
+      vLits2.push_back(x);
+      write_clause(nclauses, vLits2, fcnf);
+      vLits2.clear();
+      vLits2.push_back(-a);
+      vLits2.push_back(vCounts[i-1]);
+      write_clause(nclauses, vLits2, fcnf);
+      vLits2.clear();
+      vLits2.push_back(a);
+      vLits2.push_back(-x);
+      vLits2.push_back(-vCounts[i-1]);
+      write_clause(nclauses, vLits2, fcnf);
+      // compute OR of it and i of previous level
       nvars++;
-      fcnf << "-" << a << " ";
-      fcnf << nvars << " ";
-      fcnf << 0 << endl;
-      nclauses++;
-      fcnf << "-" << vCounts[i] << " ";
-      fcnf << nvars << " ";
-      fcnf << 0 << endl;
-      nclauses++;
-      fcnf << "-" << nvars << " ";
-      fcnf << a << " ";
-      fcnf << vCounts[i] << " ";
-      fcnf << 0 << endl;
-      nclauses++;
+      vLits2.clear();
+      vLits2.push_back(-a);
+      vLits2.push_back(nvars);
+      write_clause(nclauses, vLits2, fcnf);
+      vLits2.clear();
+      vLits2.push_back(-vCounts[i]);
+      vLits2.push_back(nvars);
+      write_clause(nclauses, vLits2, fcnf);
+      vLits2.clear();
+      vLits2.push_back(-nvars);
+      vLits2.push_back(a);
+      vLits2.push_back(vCounts[i]);
+      write_clause(nclauses, vLits2, fcnf);
       // keep it at l of this level
       vCounts[i] = nvars;
     }
     // compute OR of x and 0 of previous level
     nvars++;
-    fcnf << "-" << x << " ";
-    fcnf << nvars << " ";
-    fcnf << 0 << endl;
-    nclauses++;
-    fcnf << "-" << vCounts[0] << " ";
-    fcnf << nvars << " ";
-    fcnf << 0 << endl;
-    nclauses++;
-    fcnf << "-" << nvars << " ";
-    fcnf << x << " ";
-    fcnf << vCounts[0] << " ";
-    fcnf << 0 << endl;
-    nclauses++;
+    vLits2.clear();
+    vLits2.push_back(-x);
+    vLits2.push_back(nvars);
+    write_clause(nclauses, vLits2, fcnf);
+    vLits2.clear();
+    vLits2.push_back(-vCounts[0]);
+    vLits2.push_back(nvars);
+    write_clause(nclauses, vLits2, fcnf);
+    vLits2.clear();
+    vLits2.push_back(-nvars);
+    vLits2.push_back(x);
+    vLits2.push_back(vCounts[0]);
+    write_clause(nclauses, vLits2, fcnf);
     // keep it at 0 of this level
     vCounts[0] = nvars;
   }
 }
 
-void Cnf::gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, string cnfname) {
+void Cnf::gen_cnf(int ncycles, int nregs, int fextmem, int npipeline, string cnfname) {
   ncycles_ = ncycles;
   if(!npipeline) {
     npipeline = ncycles;
@@ -359,6 +360,33 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, string cnfn
     }
   }
 
+  // option
+  if(!fextmem) {
+    fcnf << "c not fextmem" << endl;
+    for(int k = 0; k < ncycles; k++) {
+      for(int i = ninputs; i < ndata; i++) {
+	if(find(output_ids.begin(), output_ids.end(), i) == output_ids.end()) {
+	  // do not have
+	  vLits.clear();
+	  vLits.push_back(-(k*nnodes*ndata + i + 1));
+	  write_clause(nclauses, vLits, fcnf);
+	  // do not send
+	  for(int h : outcoms[0]) {
+	    vLits.clear();
+	    vLits.push_back(-(yhead + k*ncoms*ndata + h*ndata + i + 1));
+	    write_clause(nclauses, vLits, fcnf);
+	  }
+	  // do not receive
+	  for(int h : incoms[0]) {
+	    vLits.clear();
+	    vLits.push_back(-(yhead + k*ncoms*ndata + h*ndata + i + 1));
+	    write_clause(nclauses, vLits, fcnf);
+	  }
+	}
+      }
+    }
+  }
+  
   fcnf.close();
 
   string header = "p cnf " + to_string(nvars) + " " + to_string(nclauses);
@@ -366,7 +394,6 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fexmem, int npipeline, string cnfn
   system(cmd.c_str());
 }
 
-/*
 void Cnf::gen_image(string rfilename) {
   vector<int> results;
   ifstream rfile(rfilename);
@@ -413,14 +440,13 @@ void Cnf::gen_image(string rfilename) {
   for(int k = 0; k < ncycles_; k++) {
     for(int h = 0; h < ncoms; h++) {
       for(int i = 0; i < ndata; i++) {
-	if(results[nc + k*ncoms*ndata + h*ndata + i] > 0) {
+	if(results[yhead + k*ncoms*ndata + h*ndata + i] > 0) {
 	  image[k][nnodes+h].push_back(i);
 	}
       }
     }
   }
 }
-*/
 
 /*
 void Cnf::reduce_image() {
