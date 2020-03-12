@@ -154,9 +154,9 @@ void Cnf::cardinality_amo(int &nvars, int &nclauses, vector<int> &vLits, ofstrea
     fcnf << "<= " << c << endl;
     return;
   }
-  amo_commander(nvars, nclauses, vLits, fcnf);
+  // amo_commander(nvars, nclauses, vLits, fcnf);
   // amo_naive(nclauses, vLits, fcnf);
-  // amo_bimander(nvars, nclauses, vLits, fcnf, 1); // binary
+  amo_bimander(nvars, nclauses, vLits, fcnf, 1); // binary
   // amo_bimander(nvars, nclauses, vLits, fcnf, 2);
   // amo_bimander(nvars, nclauses, vLits, fcnf, integer_root(vLits.size()));
 }
