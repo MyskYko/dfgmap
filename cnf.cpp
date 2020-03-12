@@ -10,6 +10,7 @@ using namespace std;
 
 Cnf::Cnf(vector<int> pe_nodes, vector<int> mem_nodes, vector<tuple<vector<int>, vector<int>, int> > coms, int ninputs, set<int> output_ids, map<int, set<int> > assignments, vector<set<set<int> > > operands) :pe_nodes(pe_nodes), mem_nodes(mem_nodes), coms(coms), ninputs(ninputs), output_ids(output_ids), assignments(assignments), operands(operands)
 {
+  fmultiop = 0;
   filp = 0;
   nnodes = pe_nodes.size() + mem_nodes.size();
   ndata = operands.size();
@@ -336,24 +337,47 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fextmem, int npipeline, string cnf
   for(int k = 1; k < ncycles; k++) {
     for(int j : pe_nodes) {
       for(int i = 0; i < ndata; i++) {
-	for(auto s : operands[i]) {
-	  // TODO : generate a new variable for each set
-	  if(operands[i].size() != 1) { show_error("not 1 ope"); }
-	  for(int d : s) {
-	    vLits.clear();
-	    vLits.push_back(-(zhead + k*nnodes*ndata + j*ndata + i + 1));
-	    vLits.push_back((k-1)*nnodes*ndata + j*ndata + d + 1);
-	    for(int h : incoms[j]) {
-	      vLits.push_back(yhead + k*ncoms*ndata + h*ndata + d + 1);
+	if(fmultiop) {
+	  int nvars_ = nvars;
+	  for(auto s : operands[i]) {
+	    nvars++;
+	    for(int d : s) {
+	      vLits.clear();
+	      vLits.push_back(-nvars);
+	      vLits.push_back((k-1)*nnodes*ndata + j*ndata + d + 1);
+	      for(int h : incoms[j]) {
+		vLits.push_back(yhead + k*ncoms*ndata + h*ndata + d + 1);
+	      }
+	      write_clause(nclauses, vLits, fcnf);
 	    }
-	    write_clause(nclauses, vLits, fcnf);
 	  }
-	}
-	// TODO : the variable -> OR of the new variables
-	if(operands[i].empty()) {
 	  vLits.clear();
 	  vLits.push_back(-(zhead + k*nnodes*ndata + j*ndata + i + 1));
+	  for(int l = nvars_ + 1; l <= nvars; l++) {
+	    vLits.push_back(l);
+	  }
 	  write_clause(nclauses, vLits, fcnf);
+	}
+	else {
+	  for(auto s : operands[i]) {
+	    if(operands[i].size() != 1) {
+	      show_error("not 1 ope");
+	    }
+	    for(int d : s) {
+	      vLits.clear();
+	      vLits.push_back(-(zhead + k*nnodes*ndata + j*ndata + i + 1));
+	      vLits.push_back((k-1)*nnodes*ndata + j*ndata + d + 1);
+	      for(int h : incoms[j]) {
+		vLits.push_back(yhead + k*ncoms*ndata + h*ndata + d + 1);
+	      }
+	      write_clause(nclauses, vLits, fcnf);
+	    }
+	  }
+	  if(operands[i].empty()) {
+	    vLits.clear();
+	    vLits.push_back(-(zhead + k*nnodes*ndata + j*ndata + i + 1));
+	    write_clause(nclauses, vLits, fcnf);
+	  }
 	}
       }
     }

@@ -445,6 +445,9 @@ int main(int argc, char** argv) {
   
   // instanciate problem generator
   Cnf cnf = Cnf(pe_nodes, mem_nodes, coms, ninputs, output_ids, assignments, operands);
+  if(fmac || ftransform) {
+    cnf.fmultiop = 1;
+  }
   if(filp) {
     cnf.filp = 1;
     cfilename = "_test.lp";

@@ -8,6 +8,7 @@
 
 class Cnf {
 public:
+  int fmultiop;
   int filp;
   std::vector<std::vector<std::vector<int> > > image;
 
