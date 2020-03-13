@@ -25,17 +25,6 @@ Cnf::Cnf(vector<int> pe_nodes, vector<int> mem_nodes, vector<tuple<vector<int>, 
       incoms[recipient].insert(i);
     }
   }
-  for(int i : pe_nodes) {
-    cout << i << " <- ";
-    for(int com : incoms[i]) {
-      cout << com << ",";
-    }
-    cout << " -> ";
-    for(int com : outcoms[i]) {
-      cout << com << ",";
-    }
-    cout << endl;
-  }
 }
 
 void Cnf::write_clause(int &nclauses, vector<int> &vLits, ofstream &fcnf) {
@@ -256,7 +245,7 @@ void Cnf::cardinality_amk(int &nvars, int &nclauses, vector<int> vLits, ofstream
   }
 }
 
-void Cnf::gen_cnf(int ncycles, int nregs, int fextmem, int npipeline, string cnfname) {
+void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int npipeline, string cnfname) {
   ncycles_ = ncycles;
   if(!npipeline) {
     npipeline = ncycles;
@@ -266,7 +255,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fextmem, int npipeline, string cnf
   yhead = nvars;
   nvars += ncycles * ncoms * ndata;
   zhead = nvars;
-  nvars += ncycles * nnodes * ndata; // * nproc if not single core
+  nvars += ncycles * nnodes * ndata;
   int nclauses = 0;
   
   ofstream fcnf(cnfname);
@@ -404,7 +393,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fextmem, int npipeline, string cnf
       if(nregs == 1) {
 	cardinality_amo(nvars, nclauses, vLits, fcnf);
       }
-      else {
+      else if (nregs > 0) {
 	cardinality_amk(nvars, nclauses, vLits, fcnf, nregs);
       }
     }
@@ -432,7 +421,12 @@ void Cnf::gen_cnf(int ncycles, int nregs, int fextmem, int npipeline, string cnf
 	  vLits.push_back(zhead + k*nnodes*ndata + j*ndata + i + 1);
 	}
       }
-      cardinality_amo(nvars, nclauses, vLits, fcnf); // branch if nproc used
+      if(nprocs == 1) {
+	cardinality_amo(nvars, nclauses, vLits, fcnf);
+      }
+      else if(nprocs > 0) {
+	cardinality_amk(nvars, nclauses, vLits, fcnf, nprocs);
+      }
     }
   }
 

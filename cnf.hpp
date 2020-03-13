@@ -14,7 +14,7 @@ public:
 
   Cnf(std::vector<int> pe_nodes, std::vector<int> mem_nodes, std::vector<std::tuple<std::vector<int>, std::vector<int>, int> > coms, int ninputs, std::set<int> output_ids, std::map<int, std::set<int> > assignments, std::vector<std::set<std::set<int> > > operands);
 
-  void gen_cnf(int ncycles, int nregs, int fextmem, int npipeline, std::string cnfname);
+  void gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int npipeline, std::string cnfname);
 
   void gen_image(std::string rfilename);
 

@@ -19,38 +19,28 @@ int main(int argc, char** argv) {
   string gfilename = "g.txt";
   string cfilename = "_test.cnf";
   string rfilename = "_test.out";
-  string dfilename = "_out.dot";
-  string ofilename = "out" + to_string(time(NULL));
   string satcmd = "minisat -rnd-init " + cfilename + " " + rfilename;
   //string satcmd = "glucose " + cfilename + " " + rfilename;
   //string satcmd = "lingeling " + cfilename + " > " + rfilename;
   //string satcmd = "plingeling " + cfilename + " > " + rfilename;
   
-  int ftransform = 0;
-  int fmac = 0;
+  int ncycles = 0;
+  int nregs = 2;
+  int nprocs = 1;
+  
   int fextmem = 0;
+  int fmac = 0;
+  int ftransform = 0;
+  int npipeline = 0;
+
   int finc = 0;
   int filp = 0;
-  int ncycles = 0;
-  int nregs = 1;
-  int npipeline = 0;
   int nverbose = 0;
 
   // read options
   for(int i = 1; i < argc; i++) {
     if(argv[i][0] == '-') {
       switch(argv[i][1]) {
-      case 'n':
-	try {
-	  ncycles = stoi(argv[++i]);
-	}
-	catch(...) {
-	  show_error("-n must be followed by integer");
-	}
-	if(ncycles <= 0) {
-	  show_error("the number of cycles must be more than 0");
-	}
-	break;
       case 'e':
 	if(i+1 >= argc) {
 	  show_error("-e must be followed by file name");
@@ -69,20 +59,16 @@ int main(int argc, char** argv) {
 	}
 	gfilename = argv[++i];
 	break;
-      case 'c':
-	ftransform ^= 1;
-	break;
-      case 'm':
-	fmac ^= 1;
-	break;
-      case 'x':
-	fextmem ^= 1;
-	break;
-      case 't':
-	finc ^= 1;
-	break;
-      case 'i':
-	filp ^= 1;
+      case 'n':
+	try {
+	  ncycles = stoi(argv[++i]);
+	}
+	catch(...) {
+	  show_error("-n must be followed by integer");
+	}
+	if(ncycles <= 0) {
+	  show_error("the number of cycles must be more than 0");
+	}
 	break;
       case 'r':
 	if(i+1 >= argc || argv[i+1][0] == '-') {
@@ -99,13 +85,46 @@ int main(int argc, char** argv) {
 	  show_error("the number of registers must not be 0");
 	}
 	break;
-      case 's':
+      case 'p':
+	if(i+1 >= argc || argv[i+1][0] == '-') {
+	  nprocs = -1;
+	  break;
+	}
+	try {
+	  nprocs = stoi(argv[++i]);
+	}
+	catch(...) {
+	  show_error("-p should be followed by integer");
+	}
+	if(nprocs == 0) {
+	  show_error("the number of processors must not be 0");
+	}
+	break;
+      case 'x':
+	fextmem ^= 1;
+	break;
+      case 'm':
+	fmac ^= 1;
+	break;
+      case 'c':
+	ftransform ^= 1;
+	break;
+      case 't':
 	try {
 	  npipeline = stoi(argv[++i]);
 	}
 	catch(...) {
-	  show_error("-s must be followed by integer");
+	  show_error("-t must be followed by integer");
 	}
+	if(npipeline <= 0) {
+	  show_error("the number of contexts must be more than 0");
+	}
+	break;
+      case 'a':
+	finc ^= 1;
+	break;
+      case 'i':
+	filp ^= 1;
 	break;
       case 'v':
 	if(i+1 >= argc || argv[i+1][0] == '-') {
@@ -122,17 +141,19 @@ int main(int argc, char** argv) {
       case 'h':
 	cout << "usage : gen <options>" << endl;
 	cout << "\t-h       : show this usage" << endl;
-	cout << "\t-n <int> : the number of cycles [default = " << ncycles << "]" << endl;
 	cout << "\t-e <str> : the name of environment file [default = \"" << efilename << "\"]" << endl;
 	cout << "\t-f <str> : the name of formula file [default = \"" << ffilename << "\"]" << endl;
-	cout << "\t-c       : toggle transforming dataflow [default = " << ftransform << "]" << endl;
+	cout << "\t-g <str> : the name of option file [default = \"" << gfilename << "\"]" << endl;
+	cout << "\t-n <int> : the number of cycles [default = " << ncycles << "]" << endl;
+	cout << "\t-r <int> : the number of registers in each PE (just -r means no limit) [default = " << nregs << "]" << endl;
+	cout << "\t-u <int> : the number of processors in each PE (just -u means no limit) [default = " << nprocs << "]" << endl;
+	cout << "\t-x       : toggle enabling external memory to store intermediate values [default = " << fextmem << "]" << endl;
 	cout << "\t-m       : toggle using MAC operation [default = " << fmac << "]" << endl;
-	cout << "\t-x       : toggle using external memory to store intermediate data [default = " << fextmem << "]" << endl;
-	cout << "\t-t       : toggle incremental synthesis [default = " << finc << "]" << endl;
-	cout << "\t-i       : toggle ilp [default = " << filp << "]" << endl;
-	cout << "\t-r <int> : the number of registers in each PE (unspecified int is treated as no limit) [default = " << nregs << "]" << endl;
-	cout << "\t-s <int> : the number of cycles for pipeline [default = " << npipeline << "]" << endl;
-	cout << "\t-v <int> : toggle verbosing information [default = " << nverbose << "]" << endl;
+	cout << "\t-c       : toggle transforming dataflow [default = " << ftransform << "]" << endl;
+	cout << "\t-t <int> : the number of contexts for pipeline (0 means no pipelining) [default = " << npipeline << "]" << endl;
+	cout << "\t-a       : toggle incremental synthesis [default = " << finc << "]" << endl;
+	cout << "\t-i       : toggle using ILP solver instead of SAT solver [default = " << filp << "]" << endl;
+	cout << "\t-v <int> : the level of verbosing information [default = " << nverbose << "]" << endl;
 	cout << "\t           \t0 : nothing" << endl;
 	cout << "\t           \t1 : results" << endl;
 	cout << "\t           \t2 : settings and results" << endl;
@@ -228,6 +249,9 @@ int main(int argc, char** argv) {
 	  }
 	  catch(...) {
 	    show_error("bandwidth must be integer");
+	  }
+	  if(band <= 0) {
+	    show_error("bandwidth must be more than 0");
 	  }
 	}
 	auto com = make_tuple(senders, recipients, band);
@@ -465,7 +489,7 @@ int main(int argc, char** argv) {
 
   while(1) {
     cout << "ncycles : " << ncycles << endl;
-    cnf.gen_cnf(ncycles, nregs, fextmem, npipeline, cfilename);
+    cnf.gen_cnf(ncycles, nregs, nprocs, fextmem, npipeline, cfilename);
     if(filp) {
       return 0;
     }
