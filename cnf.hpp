@@ -9,6 +9,7 @@
 class Cnf {
 public:
   int fmultiop;
+  int nencode;
   int filp;
   std::vector<std::vector<std::vector<int> > > image;
 

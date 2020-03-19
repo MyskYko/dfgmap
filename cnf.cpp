@@ -11,6 +11,7 @@ using namespace std;
 Cnf::Cnf(vector<int> pe_nodes, vector<int> mem_nodes, vector<tuple<vector<int>, vector<int>, int> > coms, int ninputs, set<int> output_ids, map<int, set<int> > assignments, vector<set<set<int> > > operands) :pe_nodes(pe_nodes), mem_nodes(mem_nodes), coms(coms), ninputs(ninputs), output_ids(output_ids), assignments(assignments), operands(operands)
 {
   fmultiop = 0;
+  nencode = 0;
   filp = 0;
   nnodes = pe_nodes.size() + mem_nodes.size();
   ndata = operands.size();
@@ -144,11 +145,25 @@ void Cnf::cardinality_amo(int &nvars, int &nclauses, vector<int> &vLits, ofstrea
     fcnf << "<= " << c << endl;
     return;
   }
-  // amo_commander(nvars, nclauses, vLits, fcnf);
-  // amo_naive(nclauses, vLits, fcnf);
-  amo_bimander(nvars, nclauses, vLits, fcnf, 1); // binary
-  // amo_bimander(nvars, nclauses, vLits, fcnf, 2);
-  // amo_bimander(nvars, nclauses, vLits, fcnf, integer_root(vLits.size()));
+  switch(nencode) {
+  case 0:
+    amo_naive(nclauses, vLits, fcnf);
+    break;
+  case 1:
+    amo_commander(nvars, nclauses, vLits, fcnf);
+    break;
+  case 2:
+    amo_bimander(nvars, nclauses, vLits, fcnf, 1); // binary
+    break;
+  case 3:
+    amo_bimander(nvars, nclauses, vLits, fcnf, 2);
+    break;
+  case 4:
+    amo_bimander(nvars, nclauses, vLits, fcnf, integer_root(vLits.size()));
+    break;
+  default:
+    show_error("the type of encoding is invalid");
+  }
 }
 
 void Cnf::cardinality_amk(int &nvars, int &nclauses, vector<int> vLits, ofstream &fcnf, int k) {

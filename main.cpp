@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
   string gfilename = "g.txt";
   string cfilename = "_test.cnf";
   string rfilename = "_test.out";
-  string satcmd = "minisat -rnd-init " + cfilename + " " + rfilename;
+  string satcmd = "minisat " + cfilename + " " + rfilename;
   //string satcmd = "glucose " + cfilename + " " + rfilename;
   //string satcmd = "lingeling " + cfilename + " > " + rfilename;
   //string satcmd = "plingeling " + cfilename + " > " + rfilename;
@@ -33,6 +33,7 @@ int main(int argc, char** argv) {
   int ftransform = 0;
   int npipeline = 0;
 
+  int nencode = 3;
   int finc = 0;
   int filp = 0;
   int nverbose = 0;
@@ -123,6 +124,17 @@ int main(int argc, char** argv) {
       case 'a':
 	finc ^= 1;
 	break;
+      case 'l':
+	try {
+	  nencode = stoi(argv[++i]);
+	}
+	catch(...) {
+	  show_error("-l must be followed by integer");
+	}
+	if(nencode < 0 || nencode > 4) {
+	  show_error("the number of cycles must be between 0 and 4");
+	}
+	break;
       case 'i':
 	filp ^= 1;
 	break;
@@ -152,6 +164,12 @@ int main(int argc, char** argv) {
 	cout << "\t-c       : toggle transforming dataflow [default = " << ftransform << "]" << endl;
 	cout << "\t-t <int> : the number of contexts for pipeline (0 means no pipelining) [default = " << npipeline << "]" << endl;
 	cout << "\t-a       : toggle incremental synthesis [default = " << finc << "]" << endl;
+	cout << "\t-l <int> : the type of at most one encoding [default = " << nencode << "]" << endl;
+	cout << "\t           \t0 : naive" << endl;
+	cout << "\t           \t1 : commander" << endl;
+	cout << "\t           \t2 : binary" << endl;
+	cout << "\t           \t3 : bimander half" << endl;
+	cout << "\t           \t4 : bimander root" << endl;	
 	cout << "\t-i       : toggle using ILP solver instead of SAT solver [default = " << filp << "]" << endl;
 	cout << "\t-v <int> : the level of verbosing information [default = " << nverbose << "]" << endl;
 	cout << "\t           \t0 : nothing" << endl;
@@ -469,6 +487,7 @@ int main(int argc, char** argv) {
   
   // instanciate problem generator
   Cnf cnf = Cnf(pe_nodes, mem_nodes, coms, ninputs, output_ids, assignments, operands);
+  cnf.nencode = nencode;
   if(fmac || ftransform) {
     cnf.fmultiop = 1;
   }
