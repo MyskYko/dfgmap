@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
   string gfilename = "g.txt";
   string cfilename = "_test.cnf";
   string rfilename = "_test.out";
-  string satcmd = "minisat " + cfilename + " " + rfilename;
+  string satcmd = "timeout 1d minisat " + cfilename + " " + rfilename;
   //string satcmd = "glucose " + cfilename + " " + rfilename;
   //string satcmd = "lingeling " + cfilename + " > " + rfilename;
   //string satcmd = "plingeling " + cfilename + " > " + rfilename;
@@ -494,6 +494,8 @@ int main(int argc, char** argv) {
   if(filp) {
     cnf.filp = 1;
     cfilename = "_test.lp";
+    rfilename = "_test.sol";
+    satcmd = "timeout 1d cplex -c \"read " + cfilename + "\" \"set emphasis mip 1\" \"set threads 1\" \"optimize\" \"write " +  rfilename + "\"";
   }
   
   if(finc && ncycles < 1) {
@@ -508,16 +510,33 @@ int main(int argc, char** argv) {
 
   while(1) {
     cout << "ncycles : " << ncycles << endl;
+    cout << "ndata : " << ndata << endl;
     cnf.gen_cnf(ncycles, nregs, nprocs, fextmem, npipeline, cfilename);
-    if(filp) {
+    int r = system(satcmd.c_str());
+    r = r >> 8;
+    if(r == 124) {
+      cout << "Timeout" << endl;
       return 0;
     }
-    system(satcmd.c_str());
-    int r = 0;
     ifstream rfile(rfilename);
+    if(filp) {
+      if(!rfile) {
+	std::cout << "No solution" << std::endl;
+	if(!finc) {
+	  return 0;
+	}
+	ncycles++;
+	continue;
+      }
+      else {
+	std::cout << "Solution found" << std::endl;
+	break;
+      }
+    }
     if(!rfile) {
       show_error("cannot open result file");
     }
+    r = 0;
     while(getline(rfile, str)) {
       string s;
       stringstream ss(str);
@@ -555,6 +574,11 @@ int main(int argc, char** argv) {
     ncycles++;
   }
 
+  if(filp) {
+    return 0;
+    // TODO read results
+  }
+    
   cnf.gen_image(rfilename);
 
   //  cnf.reduce_image();
