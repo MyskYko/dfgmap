@@ -42,9 +42,13 @@ void Dfg::create_input(string name) {
   p->type = -1;
   p->id = ninputs++;
   data_name2opnode[name] = p;
+  opnodes.push_back(p);
 }
 
-opnode *Dfg::create_opnode(string name, vector<string> &vs, int &pos) {
+Dfg::opnode *Dfg::create_opnode(vector<string> &vs, int &pos) {
+  if(pos >= vs.size()) {
+    show_error("formula file has an incomplete line");
+  }
   if(optype(vs[pos]) < 0) {
     opnode *p = data_name2opnode[vs[pos]];
     if(!p) {
@@ -56,16 +60,19 @@ opnode *Dfg::create_opnode(string name, vector<string> &vs, int &pos) {
   p->id = -1;
   p->type = optype(vs[pos]);
   for(int i = 0; i < noperands[p->type]; i++) {
-    opnode *c = create_opnode("", vs, ++pos);
+    opnode *c = create_opnode(vs, ++pos);
     p->vc.push_back(c);
   }
-  if(!name.empty()) {
-    if(data_name2opnode.count(name)) {
-      show_error("data name in formula duplicated");
-    }
-    data_name2opnode[name] = p;
-  }
+  opnodes.push_back(p);
   return p;
+}
+
+void Dfg::create_opnode(vector<string> &vs) {
+  if(data_name2opnode.count(vs[0])) {
+    show_error("data name in formula duplicated");
+  }
+  int pos = 1;
+  data_name2opnode[vs[0]] = create_opnode(vs, pos);
 }
 
 void Dfg::print_opnode(opnode *p, int depth) {
@@ -295,7 +302,8 @@ void Dfg::support_MAC() {
   }
 }
 
-void Dfg::output_ids(set<int> &ids) {
+set<int> Dfg::output_ids() {
+  set<int> ids;
   for(auto s : outputnames) {
     opnode * p = data_name2opnode[s];
     if(!p) {
@@ -303,4 +311,5 @@ void Dfg::output_ids(set<int> &ids) {
     }
     ids.insert(p->id);
   }
+  return ids;
 }

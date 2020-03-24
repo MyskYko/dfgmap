@@ -381,8 +381,7 @@ int main(int argc, char** argv) {
 	if(vs[0][0] == '.') {
 	  break;
 	}
-	int pos = 1;
-	dfg.create_opnode(vs[0], vs, pos);
+	dfg.create_opnode(vs);
       }
     }
   }
@@ -467,9 +466,7 @@ int main(int argc, char** argv) {
   }
 
   // generate operand list
-  set<int> output_ids;
   dfg.gen_operands();
-  dfg.output_ids(output_ids);
   if(fmac) {
     dfg.support_MAC();
   }
@@ -491,7 +488,7 @@ int main(int argc, char** argv) {
   }
   
   // instanciate problem generator
-  Cnf cnf = Cnf(pe_nodes, mem_nodes, coms, dfg.ninputs, output_ids, assignments, dfg.operands);
+  Cnf cnf = Cnf(pe_nodes, mem_nodes, coms, dfg.ninputs, dfg.output_ids(), assignments, dfg.operands);
   cnf.nencode = nencode;
   if(fmac || ftransform) {
     cnf.fmultiop = 1;
