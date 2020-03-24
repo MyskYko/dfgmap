@@ -9,29 +9,44 @@
 #include "global.hpp"
 
 typedef struct opnode_ {
-  int type; // input 0
+  int type;
   std::vector<struct opnode_ *> vc;
   int id;
 } opnode;
 
-class Op {
+class Dfg {
 public:
-  static std::vector<int> vcompressible;
+  int ninputs = 0;
+  std::vector<int> vcompressible;
+  std::vector<std::string> outputnames;
+  int ndata;
+  std::vector<int> optypes;
+  std::vector<std::set<std::set<int> > > operands;
+  std::map<std::pair<int, std::multiset<int> >, int> unique;
+  std::vector<std::string> datanames;
 
-  static int add_operator(std::string op, int n);
-  static opnode *create_opnode(std::vector<std::string> &vs, int &pos, std::map<std::string, opnode *> &data_name2opnode);
-  static void print_opnode(opnode * p, int depth);
-  static void compress_opnode(opnode * p);
-  static void gen_operands(opnode * p, int &ndata, std::vector<int> &optypes, std::vector<std::set<std::set<int> > > &operands, std::map<std::pair<int, std::multiset<int> >, int> &unique, std::vector<std::string> &datanames);
-  static void support_MAC(std::vector<int> &optypes, std::vector<std::set<std::set<int> > > &operands);
+  int add_operator(std::string op, int n);
+  void create_input(std::string name);
+  opnode *create_opnode(std::string name, std::vector<std::string> &vs, int &pos);
+  void gen_operands();
+  void support_MAC();
+  void print();
+  int input_id(std::string name);
+  void output_ids(std::set<int> &ids);
+  void compress();
   
 private:
-  static std::vector<std::string> operators;
-  static std::vector<int> noperands;
+  std::vector<std::string> operators;
+  std::vector<int> noperands;
+  std::map<std::string, opnode *> data_name2opnode;
   
-  static int optype(std::string s);
-  static std::string typeop(int i);
-  static int fcompressible(int i);
+  int optype(std::string s);
+  std::string typeop(int i);
+  int fcompressible(int i);
+  void print_opnode(opnode * p, int depth);
+  void compress_opnode(opnode * p);
+  void gen_operands_opnode(opnode * p);
 };
 
 #endif // OP_HPP
+

@@ -316,11 +316,7 @@ int main(int argc, char** argv) {
   if(!ffile) {
     show_error("cannot open formula file");
   }
-  int ninputs = 0;
-  map<string, opnode *> data_name2opnode;
-  vector<string> datanames;
-  vector<string> outputnames;
-  vector<opnode *> outputs;
+  Dfg dfg;
   while(getline(ffile, str)) {
     string s;
     stringstream ss(str);
@@ -333,16 +329,12 @@ int main(int argc, char** argv) {
     }
     if(vs[0] == ".i") {
       for(int i = 1; i < vs.size(); i++) {
-	datanames.push_back(vs[i]);
-	opnode * p = new opnode;
-	p->type = 0;
-	p->id = ninputs++;
-	data_name2opnode[vs[i]] = p;
+	dfg.create_input(vs[i]);
       }
     }
     if(vs[0] == ".o") {
       for(int i = 1; i < vs.size(); i++) {
-	outputnames.push_back(vs[i]);
+	dfg.outputnames.push_back(vs[i]);
       }
     }
     if(vs[0] == ".f") {
@@ -368,10 +360,10 @@ int main(int argc, char** argv) {
 	catch(...) {
 	  show_error("operator must be followed by the number of operands");
 	}
-	n = Op::add_operator(vs[0], n);
+	n = dfg.add_operator(vs[0], n);
 	for(int i = 2; i < vs.size(); i++) {
 	  if(vs[i] == "compressible") {
-	    Op::vcompressible.push_back(n);
+	    dfg.vcompressible.push_back(n);
 	  }
 	}
       }
@@ -390,35 +382,22 @@ int main(int argc, char** argv) {
 	  break;
 	}
 	int pos = 1;
-	opnode *p = Op::create_opnode(vs, pos, data_name2opnode);
-	if(data_name2opnode.count(vs[0])) {
-	  show_error("data name in formula duplicated");
-	}
-	data_name2opnode[vs[0]] = p;
+	dfg.create_opnode(vs[0], vs, pos);
       }
     }
   }
   ffile.close();
-  for(auto s : outputnames) {
-    opnode * p = data_name2opnode[s];
-    if(!p) {
-      show_error("output data " + s + " function unspecified");
-    }
-    outputs.push_back(p);
-  }
 
   if(nverbose >= 2) {
     cout << "### formula information ###" << endl;
-    for(auto p : outputs) {
-      Op::print_opnode(p, 0);
-    }
+    dfg.print();
   }
 
   // read option file
   ifstream gfile(gfilename);
   map<int, set<int> > assignments;
   set<int> sinputs;
-  for(int i = 0; i < ninputs; i++) {
+  for(int i = 0; i < dfg.ninputs; i++) {
     sinputs.insert(i);
   }
   assignments[0] = sinputs;
@@ -458,14 +437,7 @@ int main(int argc, char** argv) {
 	  }
 	  sinputs.clear();
 	  for(int i = 1; i < vs.size(); i++) {
-	    opnode * p = data_name2opnode[vs[i]];
-	    if(!p) {
-	      show_error("unspecified data " + vs[i] + " appears in option");
-	    }
-	    if(p->id == -1) {
-	      show_error("data " + vs[i] + " is not input");
-	    }
-	    sinputs.insert(p->id);
+	    sinputs.insert(dfg.input_id(vs[i]));
 	  }
 	  assignments[id] = sinputs;
 	}
@@ -487,37 +459,26 @@ int main(int argc, char** argv) {
 
   // apply compression
   if(ftransform) {
-    for(auto p : outputs) {
-      Op::compress_opnode(p);
-      // notice : memory leaks here
-    }
+    dfg.compress();
     if(nverbose >= 2) {
       cout << "### formula after compression ###" << endl;
-      for(auto p : outputs) {
-	Op::print_opnode(p, 0);
-      }
+      dfg.print();
     }
   }
 
   // generate operand list
-  int ndata = ninputs;
-  vector<int> optypes(ndata);
-  vector<set<set<int> > > operands(ndata);
-  map<pair<int, multiset<int> >, int> unique;
   set<int> output_ids;
-  for(auto p : outputs) {
-    Op::gen_operands(p, ndata, optypes, operands, unique, datanames);
-    output_ids.insert(p->id);
-  }
+  dfg.gen_operands();
+  dfg.output_ids(output_ids);
   if(fmac) {
-    Op::support_MAC(optypes, operands);
+    dfg.support_MAC();
   }
-  assert(ndata == operands.size());
+  assert(dfg.ndata == dfg.operands.size());
 
   if(nverbose >= 2) {
     cout << "### operand list ###" << endl;
     int d = 0;
-    for(auto a : operands) {
+    for(auto a : dfg.operands) {
       cout << "data " << d << " :" << endl;
       for(auto b : a) {
 	for(auto c : b) {
@@ -530,7 +491,7 @@ int main(int argc, char** argv) {
   }
   
   // instanciate problem generator
-  Cnf cnf = Cnf(pe_nodes, mem_nodes, coms, ninputs, output_ids, assignments, operands);
+  Cnf cnf = Cnf(pe_nodes, mem_nodes, coms, dfg.ninputs, output_ids, assignments, dfg.operands);
   cnf.nencode = nencode;
   if(fmac || ftransform) {
     cnf.fmultiop = 1;
@@ -554,7 +515,7 @@ int main(int argc, char** argv) {
 
   while(1) {
     cout << "ncycles : " << ncycles << endl;
-    cout << "ndata : " << ndata << endl;
+    cout << "ndata : " << dfg.ndata << endl;
     cnf.gen_cnf(ncycles, nregs, nprocs, fextmem, npipeline, cfilename);
     int r = system(satcmd.c_str());
     r = r >> 8;
@@ -651,7 +612,7 @@ int main(int argc, char** argv) {
       for(int j = 0; j < cnf.image[0].size(); j++) {
 	cout << "\t" << node_id2name[j] << " :";
 	for(int i : cnf.image[k][j]) {
-	  cout << " " << i << "#" << datanames[i];
+	  cout << " " << i << "#" << dfg.datanames[i];
 	}
 	cout << endl;
       }

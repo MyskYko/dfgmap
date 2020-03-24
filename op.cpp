@@ -5,33 +5,29 @@
 
 using namespace std;
 
-vector<string> Op::operators;
-vector<int> Op::noperands;
-vector<int> Op::vcompressible;
-
-int Op::add_operator(string op, int n) {
+int Dfg::add_operator(string op, int n) {
   operators.push_back(op);
   noperands.push_back(n);
   assert(operators.size() == noperands.size());
-  return operators.size();
+  return operators.size() - 1;
 }
 
-int Op::optype(string s) {
+int Dfg::optype(string s) {
   auto it = find(operators.begin(), operators.end(), s);
   if(it == operators.end()) {
-    return 0;
+    return -1;
   }
-  return distance(operators.begin(), it) + 1;
+  return distance(operators.begin(), it);
 }
 
-string Op::typeop(int i) {
-  if(i <= 0 || i > operators.size()) {
+string Dfg::typeop(int i) {
+  if(i < 0 || i >= operators.size()) {
     show_error("no operator at " + to_string(i) );
   }
-  return operators[i-1];
+  return operators[i];
 }
 
-int Op::fcompressible(int i) {
+int Dfg::fcompressible(int i) {
   auto it = find(vcompressible.begin(), vcompressible.end(), i);
   if(it == vcompressible.end()) {
     return 0;
@@ -40,8 +36,16 @@ int Op::fcompressible(int i) {
   return 1;
 }
 
-opnode *Op::create_opnode(vector<string> &vs, int &pos, map<string, opnode *> &data_name2opnode) {
-  if(!optype(vs[pos])) {
+void Dfg::create_input(string name) {
+  datanames.push_back(name);
+  opnode * p = new opnode;
+  p->type = -1;
+  p->id = ninputs++;
+  data_name2opnode[name] = p;
+}
+
+opnode *Dfg::create_opnode(string name, vector<string> &vs, int &pos) {
+  if(optype(vs[pos]) < 0) {
     opnode *p = data_name2opnode[vs[pos]];
     if(!p) {
       show_error("data " + vs[pos] + " unspecified");
@@ -51,18 +55,24 @@ opnode *Op::create_opnode(vector<string> &vs, int &pos, map<string, opnode *> &d
   opnode *p = new opnode;
   p->id = -1;
   p->type = optype(vs[pos]);
-  for(int i = 0; i < noperands[p->type-1]; i++) {
-    opnode *c = create_opnode(vs, ++pos, data_name2opnode);
+  for(int i = 0; i < noperands[p->type]; i++) {
+    opnode *c = create_opnode("", vs, ++pos);
     p->vc.push_back(c);
+  }
+  if(!name.empty()) {
+    if(data_name2opnode.count(name)) {
+      show_error("data name in formula duplicated");
+    }
+    data_name2opnode[name] = p;
   }
   return p;
 }
 
-void Op::print_opnode(opnode *p, int depth) {
+void Dfg::print_opnode(opnode *p, int depth) {
   for(int i = 0; i < depth; i++) {
     cout << "\t";
   }
-  if(!p->type) {
+  if(p->type < 0) {
     cout << p->id << endl;
   }
   else {
@@ -73,8 +83,29 @@ void Op::print_opnode(opnode *p, int depth) {
   }
 }
 
-void Op::compress_opnode(opnode *p) {
-  if(!p->type) {
+void Dfg::print() {
+  for(auto s : outputnames) {
+    opnode * p = data_name2opnode[s];
+    if(!p) {
+      show_error("output data " + s + " function unspecified");
+    }
+    print_opnode(p, 0);
+  }
+}
+
+int Dfg::input_id(string name) {
+  opnode * p = data_name2opnode[name];
+  if(!p) {
+    show_error("input " + name + " unspecified");
+  }
+  if(p->id < 0 || p->id >= ninputs) {
+    show_error("data " + name + " is not input");
+  }
+  return p->id;
+}
+
+void Dfg::compress_opnode(opnode *p) {
+  if(p->type < 0) {
     return;
   }
   if(fcompressible(p->type)) {
@@ -97,13 +128,23 @@ void Op::compress_opnode(opnode *p) {
   }
 }
 
-void Op::gen_operands(opnode *p, int &ndata, vector<int> &optypes, vector<set<set<int> > > &operands, map<pair<int, multiset<int> >, int> &unique, vector<string> &datanames) {
+void Dfg::compress() {
+  for(auto s : outputnames) {
+    opnode * p = data_name2opnode[s];
+    if(!p) {
+      show_error("output data " + s + " function unspecified");
+    }
+    compress_opnode(p);
+  }
+}
+
+void Dfg::gen_operands_opnode(opnode *p) {
   if(p->id != -1) {
     return;
   }
   multiset<int> cids;
   for(auto c : p->vc) {
-    gen_operands(c, ndata, optypes, operands, unique, datanames);
+    gen_operands_opnode(c);
     cids.insert(c->id);
   }
   pair<int, multiset<int> > key = make_pair(p->type, cids);
@@ -192,7 +233,24 @@ void Op::gen_operands(opnode *p, int &ndata, vector<int> &optypes, vector<set<se
   p->id = unique[key];
 }
 
-void Op::support_MAC(vector<int> &optypes, vector<set<set<int> > > &operands) {
+void Dfg::gen_operands() {
+  ndata = ninputs;
+  optypes.clear();
+  optypes.resize(ndata);
+  operands.clear();
+  operands.resize(ndata);
+  unique.clear();
+  for(auto s : outputnames) {
+    opnode * p = data_name2opnode[s];
+    if(!p) {
+      show_error("output data " + s + " function unspecified");
+    }
+    gen_operands_opnode(p);
+  }
+}
+
+
+void Dfg::support_MAC() {
   assert(optypes.size() == operands.size());
   int n = optypes.size();
   vector<set<set<int> > > new_operands(n);
@@ -237,3 +295,12 @@ void Op::support_MAC(vector<int> &optypes, vector<set<set<int> > > &operands) {
   }
 }
 
+void Dfg::output_ids(set<int> &ids) {
+  for(auto s : outputnames) {
+    opnode * p = data_name2opnode[s];
+    if(!p) {
+      show_error("output data " + s + " function unspecified");
+    }
+    ids.insert(p->id);
+  }
+}
