@@ -340,18 +340,62 @@ int main(int argc, char** argv) {
 	data_name2opnode[vs[i]] = p;
       }
     }
-    else if(vs[0] == ".o") {
+    if(vs[0] == ".o") {
       for(int i = 1; i < vs.size(); i++) {
 	outputnames.push_back(vs[i]);
       }
     }
-    else {
-      int pos = 1;
-      opnode * p = create_opnode(vs, pos, data_name2opnode);
-      if(data_name2opnode.count(vs[0])) {
-	show_error("data name in formula duplicated");
+    if(vs[0] == ".f") {
+      while(getline(ffile, str)) {
+	vs.clear();
+	stringstream ss2(str);
+	while(getline(ss2, s, ' ')) {
+	  vs.push_back(s);
+	}
+	if(vs.empty()) {
+	  continue;
+	}
+	if(vs[0][0] == '.') {
+	  break;
+	}
+	if(vs.size() < 2) {
+	  show_error("operator must be followed by the number of operands");
+	}
+	int n;
+	try {
+	  n = stoi(vs[1]);
+	}
+	catch(...) {
+	  show_error("operator must be followed by the number of operands");
+	}
+	n = Op::add_operator(vs[0], n);
+	for(int i = 2; i < vs.size(); i++) {
+	  if(vs[i] == "compressible") {
+	    Op::vcompressible.push_back(n);
+	  }
+	}
       }
-      data_name2opnode[vs[0]] = p;
+    }
+    if(vs[0] == ".n") {
+      while(getline(ffile, str)) {
+	vs.clear();
+	stringstream ss2(str);
+	while(getline(ss2, s, ' ')) {
+	  vs.push_back(s);
+	}
+	if(vs.empty()) {
+	  continue;
+	}
+	if(vs[0][0] == '.') {
+	  break;
+	}
+	int pos = 1;
+	opnode *p = Op::create_opnode(vs, pos, data_name2opnode);
+	if(data_name2opnode.count(vs[0])) {
+	  show_error("data name in formula duplicated");
+	}
+	data_name2opnode[vs[0]] = p;
+      }
     }
   }
   ffile.close();
@@ -366,7 +410,7 @@ int main(int argc, char** argv) {
   if(nverbose >= 2) {
     cout << "### formula information ###" << endl;
     for(auto p : outputs) {
-      print_opnode(p, 0);
+      Op::print_opnode(p, 0);
     }
   }
 
@@ -444,13 +488,13 @@ int main(int argc, char** argv) {
   // apply compression
   if(ftransform) {
     for(auto p : outputs) {
-      compress_opnode(p);
+      Op::compress_opnode(p);
       // notice : memory leaks here
     }
     if(nverbose >= 2) {
       cout << "### formula after compression ###" << endl;
       for(auto p : outputs) {
-	print_opnode(p, 0);
+	Op::print_opnode(p, 0);
       }
     }
   }
@@ -462,11 +506,11 @@ int main(int argc, char** argv) {
   map<pair<int, multiset<int> >, int> unique;
   set<int> output_ids;
   for(auto p : outputs) {
-    gen_operands(p, ndata, optypes, operands, unique, datanames);
+    Op::gen_operands(p, ndata, optypes, operands, unique, datanames);
     output_ids.insert(p->id);
   }
   if(fmac) {
-    support_MAC(optypes, operands);
+    Op::support_MAC(optypes, operands);
   }
   assert(ndata == operands.size());
 
@@ -584,13 +628,30 @@ int main(int argc, char** argv) {
   //  cnf.reduce_image();
   
   if(nverbose) {
+    map<int, string> node_id2name;
+    for(auto elem : node_name2id) {
+      node_id2name[elem.second] = elem.first;
+    }
+    for(int j = 0; j < coms.size(); j++) {
+      auto com = coms[j];
+      string name;
+      for(int i : get<0>(com)) {
+	name += node_id2name[i] + " ";
+      }
+      name += "-> ";
+      for(int i : get<1>(com)) {
+	name += node_id2name[i] + " ";
+      }
+      name.pop_back();
+      node_id2name[nnodes+j] = name;
+    }
     cout << "### results ###" << endl;
     for(int k = 0; k < cnf.image.size(); k++) {
       cout << "cycle " << k << " :" << endl;
       for(int j = 0; j < cnf.image[0].size(); j++) {
-	cout << "\tnode " << j << " :";
+	cout << "\t" << node_id2name[j] << " :";
 	for(int i : cnf.image[k][j]) {
-	  cout << " " << i << "(" << datanames[i] << ")";
+	  cout << " " << i << "#" << datanames[i];
 	}
 	cout << endl;
       }

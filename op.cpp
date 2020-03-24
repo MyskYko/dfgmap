@@ -1,35 +1,46 @@
 #include <cassert>
+#include <algorithm>
 
 #include "op.hpp"
 
 using namespace std;
 
-int optype(string s) {
-  switch(s[0]) {
-  case '+':
-    return 1;
-  case '*':
-    return 2;
-  default:
-    break;
-  }
-  return 0;
+vector<string> Op::operators;
+vector<int> Op::noperands;
+vector<int> Op::vcompressible;
+
+int Op::add_operator(string op, int n) {
+  operators.push_back(op);
+  noperands.push_back(n);
+  assert(operators.size() == noperands.size());
+  return operators.size();
 }
 
-string typeop(int i) {
-  switch(i) {
-  case 1:
-    return "+";
-  case 2:
-    return "*";
-  default:
-    break;
+int Op::optype(string s) {
+  auto it = find(operators.begin(), operators.end(), s);
+  if(it == operators.end()) {
+    return 0;
   }
-  return "";
+  return distance(operators.begin(), it) + 1;
 }
 
+string Op::typeop(int i) {
+  if(i <= 0 || i > operators.size()) {
+    show_error("no operator at " + to_string(i) );
+  }
+  return operators[i-1];
+}
 
-opnode *create_opnode(vector<string> &vs, int &pos, map<string, opnode *> &data_name2opnode) {
+int Op::fcompressible(int i) {
+  auto it = find(vcompressible.begin(), vcompressible.end(), i);
+  if(it == vcompressible.end()) {
+    return 0;
+  }
+  assert(noperands[i] == 2);
+  return 1;
+}
+
+opnode *Op::create_opnode(vector<string> &vs, int &pos, map<string, opnode *> &data_name2opnode) {
   if(!optype(vs[pos])) {
     opnode *p = data_name2opnode[vs[pos]];
     if(!p) {
@@ -40,20 +51,21 @@ opnode *create_opnode(vector<string> &vs, int &pos, map<string, opnode *> &data_
   opnode *p = new opnode;
   p->id = -1;
   p->type = optype(vs[pos]);
-  opnode *l = create_opnode(vs, ++pos, data_name2opnode);
-  p->vc.push_back(l);
-  opnode *r = create_opnode(vs, ++pos, data_name2opnode);
-  p->vc.push_back(r);
+  for(int i = 0; i < noperands[p->type-1]; i++) {
+    opnode *c = create_opnode(vs, ++pos, data_name2opnode);
+    p->vc.push_back(c);
+  }
   return p;
 }
 
-void print_opnode(opnode *p, int depth) {
+void Op::print_opnode(opnode *p, int depth) {
   for(int i = 0; i < depth; i++) {
     cout << "\t";
   }
   if(!p->type) {
     cout << p->id << endl;
-  } else {
+  }
+  else {
     cout << typeop(p->type) << endl;
   }
   for(auto c : p->vc) {
@@ -61,28 +73,31 @@ void print_opnode(opnode *p, int depth) {
   }
 }
 
-void compress_opnode(opnode *p) {
+void Op::compress_opnode(opnode *p) {
   if(!p->type) {
     return;
   }
-  vector<opnode *> vcn;
-  for(int i = 0; i < p->vc.size(); i++) {
-    auto c = p->vc[i];
-    if(p->type == c->type) {
-      for(auto cc : c->vc) {
-	p->vc.push_back(cc);
+  if(fcompressible(p->type)) {
+    vector<opnode *> vcn;
+    for(int i = 0; i < p->vc.size(); i++) {
+      auto c = p->vc[i];
+      if(p->type == c->type) {
+	for(auto cc : c->vc) {
+	  p->vc.push_back(cc);
+	}
       }
-    } else {
-      vcn.push_back(c);
+      else {
+	vcn.push_back(c);
+      }
     }
+    p->vc = vcn;
   }
-  p->vc = vcn;
   for(auto c : p->vc) {
     compress_opnode(c);
   }
 }
 
-void gen_operands(opnode *p, int &ndata, vector<int> &optypes, vector<set<set<int> > > &operands, map<pair<int, multiset<int> >, int> &unique, vector<string> &datanames) {
+void Op::gen_operands(opnode *p, int &ndata, vector<int> &optypes, vector<set<set<int> > > &operands, map<pair<int, multiset<int> >, int> &unique, vector<string> &datanames) {
   if(p->id != -1) {
     return;
   }
@@ -94,6 +109,27 @@ void gen_operands(opnode *p, int &ndata, vector<int> &optypes, vector<set<set<in
   pair<int, multiset<int> > key = make_pair(p->type, cids);
   if(unique[key]) {
     p->id = unique[key];
+    return;
+  }
+  if(!fcompressible(p->type)) {
+    set<set<int> > ss;
+    set<int> s(cids.begin(), cids.end());
+    ss.insert(s);
+    optypes.push_back(p->type);
+    operands.push_back(ss);
+    string dataname;
+    dataname += typeop(p->type);
+    dataname += "(";
+    for(auto id : cids) {
+      dataname += datanames[id];
+      dataname += ", ";
+    }
+    dataname.pop_back();
+    dataname.pop_back();
+    dataname += ")";
+    datanames.push_back(dataname);
+    unique[key] = ndata++;
+    p->id = unique[key];    
     return;
   }
   for(int i = 2; i <= cids.size(); i++) {
@@ -109,35 +145,30 @@ void gen_operands(opnode *p, int &ndata, vector<int> &optypes, vector<set<set<in
 				   set<set<int> > ss;
 				   for(int j = 1; j < 1 << (i-1); j++) {
 				     set<int> s;
+				     multiset<int> a;
+				     multiset<int> b;
 				     int j_ = j;
-				     vector<opnode *> a;
-				     vector<opnode *> b;
 				     for(int k = 0; k < i; k++) {
 				       if(j_ % 2) {
-					 a.push_back(p->vc[indexes[k]]);
-				       } else {
-					 b.push_back(p->vc[indexes[k]]);
+					 a.insert(p->vc[indexes[k]]->id);
+				       }
+				       else {
+					 b.insert(p->vc[indexes[k]]->id);
 				       }
 				       j_ = j_ >> 1;
 				     }
-				     multiset<int> as;
-				     for(auto q : a) {
-				       as.insert(q->id);
-				     }
-				     pair<int, multiset<int> > keya = make_pair(p->type, as);
-				     multiset<int> bs;
-				     for(auto q : b) {
-				       bs.insert(q->id);
-				     }
-				     pair<int, multiset<int> > keyb = make_pair(p->type, bs);
 				     if(a.size() == 1) {
-				       s.insert(a[0]->id);
-				     } else {
+				       s.insert(*a.begin());
+				     }
+				     else {
+				       pair<int, multiset<int> > keya = make_pair(p->type, a);
 				       s.insert(unique[keya]);
 				     }
 				     if(b.size() == 1) {
-				       s.insert(b[0]->id);
-				     } else {
+				       s.insert(*b.begin());
+				     }
+				     else {
+				       pair<int, multiset<int> > keyb = make_pair(p->type, b);
 				       s.insert(unique[keyb]);
 				     }
 				     ss.insert(s);
@@ -161,7 +192,7 @@ void gen_operands(opnode *p, int &ndata, vector<int> &optypes, vector<set<set<in
   p->id = unique[key];
 }
 
-void support_MAC(vector<int> &optypes, vector<set<set<int> > > &operands) {
+void Op::support_MAC(vector<int> &optypes, vector<set<set<int> > > &operands) {
   assert(optypes.size() == operands.size());
   int n = optypes.size();
   vector<set<set<int> > > new_operands(n);
