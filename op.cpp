@@ -172,9 +172,7 @@ void Dfg::compress_opnode(opnode *p) {
     for(int i = 0; i < p->vc.size(); i++) {
       auto c = p->vc[i];
       if(p->type == c->type) {
-	for(auto cc : c->vc) {
-	  p->vc.push_back(cc);
-	}
+	p->vc.insert(p->vc.begin() + i + 1, c->vc.begin(), c->vc.end());
       }
       else {
 	vcn.push_back(c);
@@ -235,14 +233,68 @@ void Dfg::gen_operands_opnode(opnode *p) {
     return;
   }
   if(!fcommutative(p->type)) {
-    
-    assert(0);
+    for(int i = 2; i <= cids.size(); i++) {
+      for(int j = 0; j <= cids.size()-i; j++) {
+	vector<int> sub;
+	for(int k = j; k < j+i; k++) {
+	  sub.push_back(cids[k]);
+	}
+	pair<int, vector<int> > keysub = make_pair(p->type, sub);
+	if(unique[keysub]) {
+	  continue;
+	}
+	set<vector<int> > sv;	
+	for(int k = 1; k < i; k++) {
+	  vector<int> v;
+	  vector<int> a;
+	  vector<int> b;
+	  for(int l = 0; l < k; l++) {
+	    a.push_back(sub[l]);
+	  }
+	  for(int l = k; l < i; l++) {
+	    b.push_back(sub[l]);	    
+	  }
+	  if(a.size() == 1) {
+	    v.push_back(a[0]);
+	  }
+	  else {
+	    pair<int, vector<int> > keya = make_pair(p->type, a);
+	    v.push_back(unique[keya]);
+	  }
+	  if(b.size() == 1) {
+	    v.push_back(b[0]);
+	  }
+	  else {
+	    pair<int, vector<int> > keyb = make_pair(p->type, b);
+	    v.push_back(unique[keyb]);
+	  }
+	  sort(v.begin(), v.end());
+	  sv.insert(v);	  
+	}
+	optypes.push_back(p->type);
+	voperands.push_back(sv);
+	string dataname;
+	for(auto id : sub) {
+	  dataname += datanames[id];
+	  dataname += " ";
+	  dataname += typeop(p->type);
+	  dataname += " ";
+	}
+	dataname.pop_back();
+	dataname.pop_back();
+	dataname.pop_back();
+	datanames.push_back(dataname);
+	unique[keysub] = ndata++;
+      }
+    }
+    p->id = unique[key];
+    return;
   }
   for(int i = 2; i <= cids.size(); i++) {
     foreach_comb(cids.size(), i, [&](int *indices) {
 				   vector<int> sub;
 				   for(int k = 0; k < i; k++) {
-				     sub.push_back(p->vc[indices[k]]->id);
+				     sub.push_back(cids[indices[k]]);
 				   }
 				   sort(sub.begin(), sub.end());
 				   pair<int, vector<int> > keysub = make_pair(p->type, sub);
@@ -250,17 +302,17 @@ void Dfg::gen_operands_opnode(opnode *p) {
 				     return;
 				   }
 				   set<vector<int> > sv;
-				   for(int j = 1; j < 1 << (i-1); j++) {
+				   for(int j = 1; j < (1 << (i-1)); j++) {
 				     vector<int> v;
 				     vector<int> a;
 				     vector<int> b;
 				     int j_ = j;
 				     for(int k = 0; k < i; k++) {
 				       if(j_ % 2) {
-					 a.push_back(p->vc[indices[k]]->id);
+					 a.push_back(sub[k]);
 				       }
 				       else {
-					 b.push_back(p->vc[indices[k]]->id);
+					 b.push_back(sub[k]);
 				       }
 				       j_ = j_ >> 1;
 				     }
