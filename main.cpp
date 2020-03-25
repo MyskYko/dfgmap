@@ -1,10 +1,5 @@
 #include <fstream>
 #include <sstream>
-#include <iomanip>
-#include <time.h>
-#include <cassert>
-#include <algorithm>
-#include <tuple>
 
 #include "global.hpp"
 #include "graph.hpp"
@@ -28,13 +23,13 @@ int main(int argc, char** argv) {
   int nregs = 2;
   int nprocs = 1;
   
-  int fextmem = 0;
-  int ftransform = 0;
+  bool fextmem = 0;
+  bool ftransform = 0;
   int npipeline = 0;
 
   int nencode = 3;
-  int finc = 0;
-  int filp = 0;
+  bool finc = 0;
+  bool filp = 0;
   int nverbose = 0;
 
   // read options
@@ -194,13 +189,28 @@ int main(int argc, char** argv) {
     dfg.print();
   }
 
-  string str;
+  // apply compression
+  if(ftransform) {
+    dfg.compress();
+    if(nverbose >= 2) {
+      cout << "### formula after compression ###" << endl;
+      dfg.print();
+    }
+  }
+
+  // generate operand list
+  dfg.gen_operands();
+  if(nverbose >= 2) {
+    cout << "### operand list ###" << endl;
+    dfg.print_operands();
+  }
 
   // read option file
   ifstream gfile(gfilename);
+  string str;
   map<int, set<int> > assignments;
   set<int> sinputs;
-  for(int i = 0; i < dfg.ninputs; i++) {
+  for(int i = 0; i < dfg.get_ninputs(); i++) {
     sinputs.insert(i);
   }
   assignments[0] = sinputs;
@@ -231,11 +241,11 @@ int main(int argc, char** argv) {
 	  if(vs[0][0] == '.') {
 	    break;
 	  }
-	  if(!graph.name2id.count(vs[0])) {
+	  int id = graph.get_id(vs[0]);
+	  if(id == -1) {
 	    show_error("node " + vs[0] + " does not exist");
 	  }
-	  int id = graph.name2id[vs[0]];
-	  if(find(graph.nodes["mem"].begin(), graph.nodes["mem"].end(), id) == graph.nodes["mem"].end()) {
+	  if(graph.get_type(id) != "mem") {
 	    show_error("node " + vs[0] + " is not Mem");
 	  }
 	  sinputs.clear();
@@ -259,39 +269,11 @@ int main(int argc, char** argv) {
       }
     }
   }
-
-  // apply compression
-  if(ftransform) {
-    dfg.compress();
-    if(nverbose >= 2) {
-      cout << "### formula after compression ###" << endl;
-      dfg.print();
-    }
-  }
-
-  // generate operand list
-  dfg.gen_operands();
-  assert(dfg.ndata == dfg.operands.size());
-
-  if(nverbose >= 2) {
-    cout << "### operand list ###" << endl;
-    int d = 0;
-    for(auto a : dfg.operands) {
-      cout << "data " << d << " :" << endl;
-      for(auto b : a) {
-	for(auto c : b) {
-	  cout << "\t" << setw(3) << c << ",";
-	}
-	cout << endl;
-      }
-      d++;
-    }
-  }
   
   // instanciate problem generator
-  Cnf cnf = Cnf(graph.nodes["pe"], graph.nodes["mem"], graph.edges["com"], dfg.ninputs, dfg.output_ids(), assignments, dfg.operands);
+  Cnf cnf = Cnf(graph.get_nodes("pe"), graph.get_nodes("mem"), graph.get_edges("com"), dfg.get_ninputs(), dfg.output_ids(), assignments, dfg.get_operands());
   cnf.nencode = nencode;
-  if(dfg.fmulti) {
+  if(dfg.get_fmulti()) {
     cnf.fmultiop = 1;
   }
   if(filp) {
@@ -313,7 +295,7 @@ int main(int argc, char** argv) {
 
   while(1) {
     cout << "ncycles : " << ncycles << endl;
-    cout << "ndata : " << dfg.ndata << endl;
+    cout << "ndata : " << dfg.get_ndata() << endl;
     cnf.gen_cnf(ncycles, nregs, nprocs, fextmem, npipeline, cfilename);
     int r = system(satcmd.c_str());
     r = r >> 8;
@@ -387,12 +369,10 @@ int main(int argc, char** argv) {
   //  cnf.reduce_image();
   
   if(nverbose) {
-    map<int, string> node_id2name;
-    for(auto elem : graph.name2id) {
-      node_id2name[elem.second] = elem.first;
-    }
-    for(int j = 0; j < graph.edges["com"].size(); j++) {
-      auto com = graph.edges["com"][j];
+    map<int, string> node_id2name = graph.get_id2name();
+    auto coms = graph.get_edges("com");
+    for(int j = 0; j < coms.size(); j++) {
+      auto com = coms[j];
       string name;
       for(int i : get<0>(com)) {
 	name += node_id2name[i] + " ";
@@ -402,7 +382,7 @@ int main(int argc, char** argv) {
 	name += node_id2name[i] + " ";
       }
       name.pop_back();
-      node_id2name[graph.nnodes+j] = name;
+      node_id2name[graph.get_nnodes() + j] = name;
     }
     cout << "### results ###" << endl;
     for(int k = 0; k < cnf.image.size(); k++) {
@@ -410,7 +390,7 @@ int main(int argc, char** argv) {
       for(int j = 0; j < cnf.image[0].size(); j++) {
 	cout << "\t" << node_id2name[j] << " :";
 	for(int i : cnf.image[k][j]) {
-	  cout << " " << i << "#" << dfg.datanames[i];
+	  cout << " " << i << "#" << dfg.get_dataname(i);
 	}
 	cout << endl;
       }

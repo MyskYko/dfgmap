@@ -6,62 +6,69 @@
 #include <map>
 #include <set>
 
-#include "global.hpp"
-
 class Dfg {
 public:
-  int ninputs = 0;
-  std::vector<std::string> outputnames;
-  int ndata;
-  int fmulti = 0;
-  std::vector<std::set<std::set<int> > > operands;
-  std::vector<std::string> datanames;
-
+  int get_ninputs() { return ninputs; }
+  int get_ndata() { return ndata; }
+  bool get_fmulti() { return fmulti; }
+  std::string get_dataname(int i) { return datanames[i]; }
+  std::vector<std::set<std::set<int> > > get_operands() { return operands; }
+  
   void read(std::string filename);
-  int add_operator(std::string s, int n);
-  void make_commutative(int i);
-  void make_associative(int i);
-  void create_input(std::string name);
-  void add_multiope(std::vector<std::string> &vs);
-  void create_opnode(std::vector<std::string> &vs);
-  void print();
-  int input_id(std::string name);
   void compress();
   void gen_operands();
-  void support_multiope();
+  
+  int input_id(std::string name);
   std::set<int> output_ids();
   
+  void print();
+  void print_operands();
+  
 private:
-  typedef struct opnode_ {
+  typedef struct node_ {
     int type;
-    std::vector<struct opnode_ *> vc;
+    std::vector<struct node_ *> vc;
     int id;
-  } opnode;
-
+  } node;
+  
   typedef struct opr_ {
     std::string s;
     int n;
     int attr;
   } opr;
 
-  std::vector<opnode *> opnodes;
+  int ninputs = 0;
+  int ndata;
+  bool fmulti = 0;
+  std::vector<std::string> datanames;
+  std::vector<std::set<std::set<int> > > operands;
+  std::vector<node *> nodes;
+  std::vector<std::string> outputnames;
   std::vector<opr *> oprs;
-  std::map<std::string, opnode *> data_name2opnode;
-  std::vector<opnode *> multiopes;
-  std::vector<std::set<std::vector<int> > > voperands;
-  std::vector<int> optypes;
+  std::map<std::string, node *> name2node;
+  std::vector<node *> multioprs;
+  std::vector<std::set<std::vector<int> > > operands_;
+  std::vector<int> oprtypes;
   std::map<std::pair<int, std::vector<int> >, int> unique;
   
-  int optype(std::string s);
-  std::string typeop(int i);
-  int fcommutative(int i);
-  int fassociative(int i);
-  opnode *create_multiope(std::vector<std::string> &vs, int &pos);
-  opnode *create_opnode(std::vector<std::string> &vs, int &pos);
-  void print_opnode(opnode * p, int depth);
-  void compress_opnode(opnode * p);
-  void gen_operands_opnode(opnode * p);
-  int support_multiope_rec(int id, opnode *ope, std::vector<std::set<int> > &vs);
+  int oprtype(std::string s);
+  std::string typeopr(int i);
+  bool fcommutative(int i);
+  bool fassociative(int i);
+  node *create_multiopr(std::vector<std::string> &vs, int &pos);
+  node *create_node(std::vector<std::string> &vs, int &pos);
+  
+  void create_opr(std::string s, int n, bool fc = 0, bool fa = 0);
+  void create_input(std::string name);
+  void create_multiopr(std::vector<std::string> &vs);
+  void create_node(std::vector<std::string> &vs);
+  
+  void compress_node(node * p);
+  bool support_multiopr_rec(int id, node *ope, std::vector<std::set<int> > &vs);
+  void support_multiopr();
+  void gen_operands_node(node * p);
+  
+  void print_node(node * p, int depth);
 };
 
 #endif // DFG_HPP

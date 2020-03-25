@@ -1,22 +1,28 @@
 #include <fstream>
 #include <sstream>
-#include <cassert>
-#include <algorithm>
+#include <iterator>
+#include <iomanip>
 
+#include "global.hpp"
 #include "dfg.hpp"
 
 using namespace std;
 
-int Dfg::add_operator(string s, int n) {
+void Dfg::create_opr(string s, int n, bool fc, bool fa) {
   opr * p = new opr;
   p->s = s;
   p->n = n;
   p->attr = 0;
+  if(fc) {
+    p->attr += 1;
+  }
+  if(fa) {
+    p->attr += 2;
+  }
   oprs.push_back(p);
-  return oprs.size() - 1;
 }
 
-int Dfg::optype(string s) {
+int Dfg::oprtype(string s) {
   for(int i = 0; i < oprs.size(); i++) {
     if(oprs[i]->s == s) {
       return i;
@@ -25,111 +31,98 @@ int Dfg::optype(string s) {
   return -1;
 }
 
-string Dfg::typeop(int i) {
+string Dfg::typeopr(int i) {
   if(i < 0 || i >= oprs.size()) {
-    show_error("no operator at " + to_string(i) );
+    show_error("no oprtype", to_string(i) );
   }
   return oprs[i]->s;
 }
 
-int Dfg::fcommutative(int i) {
+bool Dfg::fcommutative(int i) {
   if(i < 0 || i >= oprs.size()) {
-    show_error("no operator at " + to_string(i) );
+    show_error("no oprtype", to_string(i) );
   }
   return oprs[i]->attr % 2;
 }
 
-int Dfg::fassociative(int i) {
+bool Dfg::fassociative(int i) {
   if(i < 0 || i >= oprs.size()) {
-    show_error("no operator at " + to_string(i) );
+    show_error("no oprtype", to_string(i) );
   }
-  return (oprs[i]->attr >> 1) % 2;
-}
-
-void Dfg::make_commutative(int i) {
-  if(fcommutative(i)) {
-    show_error("operator " + to_string(i) + " is already commutative");
-  }
-  oprs[i]->attr += 1;
-}
-
-void Dfg::make_associative(int i) {
-  if(fassociative(i)) {
-    show_error("operator " + to_string(i) + " is already associative");
-  }
-  if(oprs[i]->n != 2) {
-    show_error("associative operator must have 2 inputs");
-  }
-  oprs[i]->attr += 2;
+  return oprs[i]->attr >> 1;
 }
 
 void Dfg::create_input(string name) {
   datanames.push_back(name);
-  opnode * p = new opnode;
+  node * p = new node;
   p->type = -1;
   p->id = ninputs++;
-  data_name2opnode[name] = p;
-  opnodes.push_back(p);
+  name2node[name] = p;
+  nodes.push_back(p);
 }
 
-Dfg::opnode *Dfg::create_multiope(vector<string> &vs, int &pos) {
+Dfg::node *Dfg::create_multiopr(vector<string> &vs, int &pos) {
   if(pos >= vs.size()) {
-    show_error("formula file has an incomplete line");
+    ostringstream os;
+    copy(vs.begin(), vs.end(), ostream_iterator<string>(os, " "));
+    show_error("incomplete line", os.str());
   }
-  if(optype(vs[pos]) < 0) {
+  if(oprtype(vs[pos]) < 0) {
     return NULL;
   }
-  opnode *p = new opnode;
+  node *p = new node;
   p->id = 1;
-  p->type = optype(vs[pos]);
+  p->type = oprtype(vs[pos]);
   for(int i = 0; i < oprs[p->type]->n; i++) {
-    opnode *c = create_multiope(vs, ++pos);
+    node *c = create_multiopr(vs, ++pos);
     if(c) {
       p->id = 0;
     }
     p->vc.push_back(c);
   }
-  opnodes.push_back(p);
+  nodes.push_back(p);
   return p;
 }
 
-void Dfg::add_multiope(vector<string> &vs) {
+void Dfg::create_multiopr(vector<string> &vs) {
   int pos = 0;
-  opnode * p = create_multiope(vs, pos);
-  multiopes.push_back(p);
+  node * p = create_multiopr(vs, pos);
+  multioprs.push_back(p);
 }
 
-Dfg::opnode *Dfg::create_opnode(vector<string> &vs, int &pos) {
+Dfg::node *Dfg::create_node(vector<string> &vs, int &pos) {
   if(pos >= vs.size()) {
-    show_error("formula file has an incomplete line");
+    ostringstream os;
+    copy(vs.begin(), vs.end(), ostream_iterator<string>(os, " "));
+    show_error("incomplete line", os.str());
   }
-  if(optype(vs[pos]) < 0) {
-    opnode *p = data_name2opnode[vs[pos]];
+  if(oprtype(vs[pos]) < 0) {
+    node *p = name2node[vs[pos]];
     if(!p) {
-      show_error("data " + vs[pos] + " unspecified");
+      show_error("unspecified data", vs[pos]);
     }
     return p;
   }
-  opnode *p = new opnode;
+  node *p = new node;
   p->id = -1;
-  p->type = optype(vs[pos]);
+  p->type = oprtype(vs[pos]);
   for(int i = 0; i < oprs[p->type]->n; i++) {
-    opnode *c = create_opnode(vs, ++pos);
+    node *c = create_node(vs, ++pos);
     p->vc.push_back(c);
   }
-  opnodes.push_back(p);
+  nodes.push_back(p);
   return p;
 }
 
-void Dfg::create_opnode(vector<string> &vs) {
-  if(data_name2opnode.count(vs[0])) {
-    show_error("data name in formula duplicated");
+void Dfg::create_node(vector<string> &vs) {
+  if(name2node.count(vs[0])) {
+    show_error("duplicated data", vs[0]);
   }
   int pos = 1;
-  data_name2opnode[vs[0]] = create_opnode(vs, pos);
+  name2node[vs[0]] = create_node(vs, pos);
 }
 
-void Dfg::print_opnode(opnode *p, int depth) {
+void Dfg::print_node(node *p, int depth) {
   for(int i = 0; i < depth; i++) {
     cout << "\t";
   }
@@ -137,40 +130,40 @@ void Dfg::print_opnode(opnode *p, int depth) {
     cout << p->id << endl;
   }
   else {
-    cout << typeop(p->type) << endl;
+    cout << typeopr(p->type) << endl;
   }
   for(auto c : p->vc) {
-    print_opnode(c, depth + 1);
+    print_node(c, depth + 1);
   }
 }
 
 void Dfg::print() {
   for(auto s : outputnames) {
-    opnode * p = data_name2opnode[s];
+    node * p = name2node[s];
     if(!p) {
-      show_error("output data " + s + " function unspecified");
+      show_error("unspecified output", s);
     }
-    print_opnode(p, 0);
+    print_node(p, 0);
   }
 }
 
 int Dfg::input_id(string name) {
-  opnode * p = data_name2opnode[name];
+  node * p = name2node[name];
   if(!p) {
-    show_error("input " + name + " unspecified");
+    show_error("unspecified input", name);
   }
   if(p->id < 0 || p->id >= ninputs) {
-    show_error("data " + name + " is not input");
+    show_error("non-input data", name);
   }
   return p->id;
 }
 
-void Dfg::compress_opnode(opnode *p) {
+void Dfg::compress_node(node *p) {
   if(p->type < 0) {
     return;
   }
   if(fassociative(p->type)) {
-    vector<opnode *> vcn;
+    vector<node *> vcn;
     for(int i = 0; i < p->vc.size(); i++) {
       auto c = p->vc[i];
       if(p->type == c->type) {
@@ -183,27 +176,27 @@ void Dfg::compress_opnode(opnode *p) {
     p->vc = vcn;
   }
   for(auto c : p->vc) {
-    compress_opnode(c);
+    compress_node(c);
   }
 }
 
 void Dfg::compress() {
   for(auto s : outputnames) {
-    opnode * p = data_name2opnode[s];
+    node * p = name2node[s];
     if(!p) {
-      show_error("output data " + s + " function unspecified");
+      show_error("unspecified output", s);
     }
-    compress_opnode(p);
+    compress_node(p);
   }
 }
 
-void Dfg::gen_operands_opnode(opnode *p) {
+void Dfg::gen_operands_node(node *p) {
   if(p->id != -1) {
     return;
   }
   vector<int> cids;
   for(auto c : p->vc) {
-    gen_operands_opnode(c);
+    gen_operands_node(c);
     cids.push_back(c->id);
   }
   if(fcommutative(p->type)) {
@@ -217,10 +210,10 @@ void Dfg::gen_operands_opnode(opnode *p) {
   if(!fassociative(p->type)) {
     set<vector<int> > sv;
     sv.insert(cids);
-    optypes.push_back(p->type);
-    voperands.push_back(sv);
+    oprtypes.push_back(p->type);
+    operands_.push_back(sv);
     string dataname;
-    dataname += typeop(p->type);
+    dataname += typeopr(p->type);
     dataname += "(";
     for(auto id : cids) {
       dataname += datanames[id];
@@ -273,13 +266,13 @@ void Dfg::gen_operands_opnode(opnode *p) {
 	  sort(v.begin(), v.end());
 	  sv.insert(v);	  
 	}
-	optypes.push_back(p->type);
-	voperands.push_back(sv);
+	oprtypes.push_back(p->type);
+	operands_.push_back(sv);
 	string dataname;
 	for(auto id : sub) {
 	  dataname += datanames[id];
 	  dataname += " ";
-	  dataname += typeop(p->type);
+	  dataname += typeopr(p->type);
 	  dataname += " ";
 	}
 	dataname.pop_back();
@@ -337,13 +330,13 @@ void Dfg::gen_operands_opnode(opnode *p) {
 				     sort(v.begin(), v.end());
 				     sv.insert(v);
 				   }
-				   optypes.push_back(p->type);
-				   voperands.push_back(sv);
+				   oprtypes.push_back(p->type);
+				   operands_.push_back(sv);
 				   string dataname;
 				   for(auto id : sub) {
 				     dataname += datanames[id];
 				     dataname += " ";
-				     dataname += typeop(p->type);
+				     dataname += typeopr(p->type);
 				     dataname += " ";
 				   }
 				   dataname.pop_back();
@@ -358,24 +351,24 @@ void Dfg::gen_operands_opnode(opnode *p) {
 
 void Dfg::gen_operands() {
   ndata = ninputs;
-  optypes.clear();
-  optypes.resize(ndata);
-  voperands.clear();
-  voperands.resize(ndata);
+  oprtypes.clear();
+  oprtypes.resize(ndata);
+  operands_.clear();
+  operands_.resize(ndata);
   unique.clear();
   for(auto s : outputnames) {
-    opnode * p = data_name2opnode[s];
+    node * p = name2node[s];
     if(!p) {
-      show_error("output data " + s + " function unspecified");
+      show_error("unspecified output", s);
     }
-    gen_operands_opnode(p);
+    gen_operands_node(p);
   }
   fmulti = 0;
   operands.clear();
-  operands.resize(voperands.size());
-  support_multiope();
-  for(int i = 0; i < voperands.size(); i++) {
-    for(auto &v : voperands[i]) {
+  operands.resize(ndata);
+  support_multiopr();
+  for(int i = 0; i < ndata; i++) {
+    for(auto &v : operands_[i]) {
       set<int> s(v.begin(), v.end());
       operands[i].insert(s);
     }
@@ -385,23 +378,23 @@ void Dfg::gen_operands() {
   }
 }
 
-int Dfg::support_multiope_rec(int id, opnode *ope, vector<set<int> > &vs) {
+bool Dfg::support_multiopr_rec(int id, node *ope, vector<set<int> > &vs) {
   if(ope == NULL) {
     for(auto &s : vs) {
       s.insert(id);
     }
     return 1;
   }
-  if(optypes[id] != ope->type) {
+  if(oprtypes[id] != ope->type) {
     return 0;
   }
   set<set<int> > ss;
-  for(auto &v : voperands[id]) {
+  for(auto &v : operands_[id]) {
     if(fcommutative(ope->type) && !ope->id) {
       foreach_perm(oprs[ope->type]->n, [&](int *indices) {
 			 vector<set<int> > vs2(1);
 			 for(int i = 0; i < oprs[ope->type]->n; i++) {
-			   int r = support_multiope_rec(v[indices[i]], ope->vc[i], vs2);
+			   bool r = support_multiopr_rec(v[indices[i]], ope->vc[i], vs2);
 			   if(!r) {
 			     return;
 			   }
@@ -411,9 +404,9 @@ int Dfg::support_multiope_rec(int id, opnode *ope, vector<set<int> > &vs) {
     }
     else {
       vector<set<int> > vs2(1);
-      int r = 0;
+      bool r = 0;
       for(int i = 0; i < oprs[ope->type]->n; i++) {
-	r = support_multiope_rec(v[i], ope->vc[i], vs2);
+	r = support_multiopr_rec(v[i], ope->vc[i], vs2);
 	if(!r) {
 	  break;
 	}
@@ -444,13 +437,11 @@ int Dfg::support_multiope_rec(int id, opnode *ope, vector<set<int> > &vs) {
   return 1;
 }
 
-void Dfg::support_multiope() {
-  assert(optypes.size() == voperands.size());
-  for(auto multiope : multiopes) {
-    for(int i = 0; i < optypes.size(); i++) {
+void Dfg::support_multiopr() {
+  for(auto multiopr : multioprs) {
+    for(int i = 0; i < ndata; i++) {
       vector<set<int> > vs(1);
-      int r;
-      r = support_multiope_rec(i, multiope, vs);
+      bool r = support_multiopr_rec(i, multiopr, vs);
       if(r) {
 	operands[i].insert(vs.begin(), vs.end());
       }
@@ -461,9 +452,9 @@ void Dfg::support_multiope() {
 set<int> Dfg::output_ids() {
   set<int> ids;
   for(auto s : outputnames) {
-    opnode * p = data_name2opnode[s];
+    node * p = name2node[s];
     if(!p) {
-      show_error("output data " + s + " function unspecified");
+      show_error("unspecified output", s);
     }
     ids.insert(p->id);
   }
@@ -475,7 +466,7 @@ void Dfg::read(string filename) {
   if(!f) {
     show_error("cannot open file", filename);
   }
-  int r = 1;
+  bool r = 1;
   string l, s;
   stringstream ss;
   vector<string> vs;
@@ -530,15 +521,17 @@ void Dfg::read(string filename) {
 	catch(...) {
 	  show_error("non-integer noperands", vs[1]);
 	}
-	n = add_operator(vs[0], n);
+	bool fc = 0;
+	bool fa = 0;
 	for(int i = 2; i < vs.size(); i++) {
 	  if(vs[i] == "c") {
-	    make_commutative(n);
+	    fc = 1;
 	  }
 	  if(vs[i] == "a") {
-	    make_associative(n);
+	    fa = 1;
 	  }
 	}
+	create_opr(vs[0], n, fc, fa);
       }
     }
     if(vs[0] == ".m") {
@@ -556,7 +549,7 @@ void Dfg::read(string filename) {
 	  r = 0;
 	  break;
 	}
-	add_multiope(vs);
+	create_multiopr(vs);
       }
     }
     if(vs[0] == ".n") {
@@ -574,9 +567,23 @@ void Dfg::read(string filename) {
 	  r = 0;
 	  break;
 	}
-	create_opnode(vs);
+	create_node(vs);
       }
     }
   }
   f.close();
+}
+
+void Dfg::print_operands() {
+  int d = 0;
+  for(auto &a : operands) {
+    cout << "data " << d << " :" << endl;
+    for(auto &b : a) {
+      for(auto c : b) {
+	cout << "\t" << setw(3) << c << ",";
+      }
+      cout << endl;
+    }
+    d++;
+  }
 }

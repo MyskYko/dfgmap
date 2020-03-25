@@ -19,7 +19,7 @@ void Graph::read(string filename) {
   if(!f) {
     show_error("cannot open file", filename);
   }
-  int r = 1;
+  bool r = 1;
   string l, s;
   stringstream ss;
   vector<string> vs;
