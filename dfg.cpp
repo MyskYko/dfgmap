@@ -1,7 +1,7 @@
 #include <cassert>
 #include <algorithm>
 
-#include "op.hpp"
+#include "dfg.hpp"
 
 using namespace std;
 

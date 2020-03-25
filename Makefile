@@ -1,10 +1,16 @@
-gen:op.o cnf.o main.o 
-	g++ -g $^ -o gen
-op.o:op.cpp
-	g++ -g -c op.cpp
-main.o:main.cpp
-	g++ -g -c main.cpp
-cnf.o:cnf.cpp
-	g++ -g -c cnf.cpp
+CC      = g++
+CFLAGS  = -g -Wall
+SOURCES = $(shell ls *.cpp)
+OBJS    = $(SOURCES:.cpp=.o)
+TARGET  = dfgmap
+
+all: $(TARGET)
+
+$(TARGET): $(OBJS)
+	$(CC) -o $@ $(OBJS)
+
+%.o: %.cpp 
+	$(CC) $(CFLAGS) -o $@ -c $< 
+
 clean:
-	rm -f *.o gen
+	$(RM) $(OBJS) $(TARGET)

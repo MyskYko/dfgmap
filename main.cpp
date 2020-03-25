@@ -7,7 +7,7 @@
 #include <tuple>
 
 #include "global.hpp"
-#include "op.hpp"
+#include "dfg.hpp"
 #include "cnf.hpp"
 
 using namespace std;
