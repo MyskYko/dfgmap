@@ -37,6 +37,14 @@ public:
     }
     return "";
   }
+
+  std::vector<std::string> get_types() {
+    std::vector<std::string> v;
+    for(auto &i : nodes) {
+      v.push_back(i.first);
+    }
+    return v;
+  }
   
   void create_node(std::string type, std::string name);
   void read(std::string filename);

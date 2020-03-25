@@ -12,12 +12,13 @@ int main(int argc, char** argv) {
   string efilename = "e.txt";
   string ffilename = "f.txt";
   string gfilename = "g.txt";
-  string cfilename = "_test.cnf";
+  string pfilename = "_test.cnf";
   string rfilename = "_test.out";
-  string satcmd = "timeout 1d minisat " + cfilename + " " + rfilename;
-  //string satcmd = "glucose " + cfilename + " " + rfilename;
-  //string satcmd = "lingeling " + cfilename + " > " + rfilename;
-  //string satcmd = "plingeling " + cfilename + " > " + rfilename;
+  
+  string solver_cmd = "minisat " + pfilename + " " + rfilename;
+  //string solver_cmd = "glucose " + pfilename + " " + rfilename;
+  //string solver_cmd = "lingeling " + pfilename + " > " + rfilename;
+  //string solver_cmd = "plingeling " + pfilename + " > " + rfilename;
   
   int ncycles = 0;
   int nregs = 2;
@@ -25,14 +26,14 @@ int main(int argc, char** argv) {
   
   bool fextmem = 0;
   bool ftransform = 0;
-  int npipeline = 0;
+  int ncontexts = 0;
 
   int nencode = 3;
   bool finc = 0;
   bool filp = 0;
   int nverbose = 0;
 
-  // read options
+  // read command
   for(int i = 1; i < argc; i++) {
     if(argv[i][0] == '-') {
       switch(argv[i][1]) {
@@ -103,12 +104,12 @@ int main(int argc, char** argv) {
 	break;
       case 't':
 	try {
-	  npipeline = stoi(argv[++i]);
+	  ncontexts = stoi(argv[++i]);
 	}
 	catch(...) {
 	  show_error("-t must be followed by integer");
 	}
-	if(npipeline <= 0) {
+	if(ncontexts <= 0) {
 	  show_error("the number of contexts must be more than 0");
 	}
 	break;
@@ -152,7 +153,7 @@ int main(int argc, char** argv) {
 	cout << "\t-u <int> : the number of processors in each PE (just -u means no limit) [default = " << nprocs << "]" << endl;
 	cout << "\t-x       : toggle enabling external memory to store intermediate values [default = " << fextmem << "]" << endl;
 	cout << "\t-c       : toggle transforming dataflow [default = " << ftransform << "]" << endl;
-	cout << "\t-t <int> : the number of contexts for pipeline (0 means no pipelining) [default = " << npipeline << "]" << endl;
+	cout << "\t-t <int> : the number of contexts for pipeline (0 means no pipelining) [default = " << ncontexts << "]" << endl;
 	cout << "\t-a       : toggle incremental synthesis [default = " << finc << "]" << endl;
 	cout << "\t-l <int> : the type of at most one encoding [default = " << nencode << "]" << endl;
 	cout << "\t           \t0 : naive" << endl;
@@ -205,99 +206,112 @@ int main(int argc, char** argv) {
     dfg.print_operands();
   }
 
-  // read option file
-  ifstream gfile(gfilename);
-  string str;
-  map<int, set<int> > assignments;
-  set<int> sinputs;
-  for(int i = 0; i < dfg.get_ninputs(); i++) {
-    sinputs.insert(i);
+  // instanciate problem generator
+  for(auto type : graph.get_types()) {
+    if(type != "pe" && type != "mem") {
+      show_error("unknown type", type);
+    }
   }
-  assignments[0] = sinputs;
-  if(!gfile) {
-    cout << "no option file" << endl;
-  }
-  else {
-    while(getline(gfile, str)) {
-      string s;
-      stringstream ss(str);
+  Cnf cnf = Cnf(graph.get_nodes("pe"), graph.get_nodes("mem"), graph.get_edges("com"), dfg.get_ninputs(), dfg.output_ids(), dfg.get_operands());
+
+  // set option
+  {
+    cnf.nencode = nencode;
+    cnf.fmulti = dfg.get_fmulti();
+    cnf.filp = filp;
+
+    // read option file
+    ifstream f(gfilename);
+    if(!f) {
+      cout << "no option file" << endl;
+    }
+    else {
+      bool r = 1;
+      string l, s;
+      stringstream ss;
       vector<string> vs;
-      while(getline(ss, s, ' ')) {
-	vs.push_back(s);
-      }
-      if(vs.empty()) {
-	continue;
-      }
-      if(vs[0] == ".assign") {
-	while(getline(gfile, str)) {
+      while(1) {
+	if(r) {
+	  if(!getline(f, l)) {
+	    break;
+	  }
 	  vs.clear();
-	  stringstream ss2(str);
-	  while(getline(ss2, s, ' ')) {
+	  ss.str(l);
+	  ss.clear();
+	  while(getline(ss, s, ' ')) {
 	    vs.push_back(s);
 	  }
 	  if(vs.empty()) {
 	    continue;
 	  }
-	  if(vs[0][0] == '.') {
-	    break;
+	}
+	r = 1;
+	if(vs[0] == ".assign") {
+	  while(getline(f, l)) {
+	    vs.clear();
+	    ss.str(l);
+	    ss.clear();
+	    while(getline(ss, s, ' ')) {
+	      vs.push_back(s);
+	    }
+	    if(vs.empty()) {
+	      continue;
+	    }
+	    if(vs[0][0] == '.') {
+	      r = 0;
+	      break;
+	    }
+	    int id = graph.get_id(vs[0]);
+	    if(id == -1) {
+	      show_error("unspecified node", vs[0]);
+	    }
+	    if(graph.get_type(id) != "mem") {
+	      show_error("non-Mem node", vs[0]);
+	    }
+	    set<int> sinputs;
+	    for(int i = 1; i < vs.size(); i++) {
+	      sinputs.insert(dfg.input_id(vs[i]));
+	    }
+	    cnf.assignments[id] = sinputs;
 	  }
-	  int id = graph.get_id(vs[0]);
-	  if(id == -1) {
-	    show_error("node " + vs[0] + " does not exist");
+	}
+      }
+      if(nverbose >= 2) {
+	cout << "### option information ###" << endl;
+	cout << "assignments :" << endl;
+	for(auto i : cnf.assignments) {
+	  cout << "node " << i.first << " :" << endl;
+	  for(auto j : i.second) {
+	    cout << j << ", ";
 	  }
-	  if(graph.get_type(id) != "mem") {
-	    show_error("node " + vs[0] + " is not Mem");
-	  }
-	  sinputs.clear();
-	  for(int i = 1; i < vs.size(); i++) {
-	    sinputs.insert(dfg.input_id(vs[i]));
-	  }
-	  assignments[id] = sinputs;
+	  cout << endl;
 	}
       }
     }
-    
-    if(nverbose >= 2) {
-      cout << "### option information ###" << endl;
-      cout << "assignments :" << endl;
-      for(auto assignment : assignments) {
-	cout << assignment.first << " <- ";
-	for(auto id : assignment.second) {
-	  cout << id << ",";
-	}
-	cout << endl;
-      }
-    }
   }
-  
-  // instanciate problem generator
-  Cnf cnf = Cnf(graph.get_nodes("pe"), graph.get_nodes("mem"), graph.get_edges("com"), dfg.get_ninputs(), dfg.output_ids(), assignments, dfg.get_operands());
-  cnf.nencode = nencode;
-  if(dfg.get_fmulti()) {
-    cnf.fmultiop = 1;
-  }
-  if(filp) {
-    cnf.filp = 1;
-    cfilename = "_test.lp";
-    rfilename = "_test.sol";
-    satcmd = "timeout 1d cplex -c \"read " + cfilename + "\" \"set emphasis mip 1\" \"set threads 1\" \"optimize\" \"write " +  rfilename + "\"";
-  }
-  
+
+  // prepare parameters
   if(finc && ncycles < 1) {
     ncycles = 1;
   }
-  
   if(ncycles < 1) {
     cout << "your files are valid" << endl;
     cout << "to run synthesis, please specify the number of cycles by using option -n" << endl;
     return 0;
   }
+  if(filp) {
+    pfilename = "_test.lp";
+    rfilename = "_test.sol";
+    solver_cmd = "cplex -c \"read " + pfilename + "\" \"set emphasis mip 1\" \"set threads 1\" \"optimize\" \"write " +  rfilename + "\"";
+  }
 
+  // solve
   while(1) {
     cout << "ncycles : " << ncycles << endl;
     cout << "ndata : " << dfg.get_ndata() << endl;
-    cnf.gen_cnf(ncycles, nregs, nprocs, fextmem, npipeline, cfilename);
-    int r = system(satcmd.c_str());
+    cnf.gen_cnf(ncycles, nregs, nprocs, fextmem, ncontexts, pfilename);
+    string cmd = "timeout 1d " + solver_cmd;
+    int r = system(cmd.c_str());
     r = r >> 8;
     if(r == 124) {
       cout << "Timeout" << endl;
@@ -322,6 +336,7 @@ int main(int argc, char** argv) {
       show_error("cannot open result file");
     }
     r = 0;
+    string str;
     while(getline(rfile, str)) {
       string s;
       stringstream ss(str);
