@@ -12,6 +12,12 @@ static inline void show_error(std::string s) {
   abort();
 }
 
+static inline void show_error(std::string s, std::string s2) {
+  std::cout << "error : " << s << " \"" << s2 << "\"" << std::endl;
+  std::cout << "see usage by using option -h" << std::endl;
+  abort();
+}
+
 static void recursive_comb(int *indices, int s, int rest, std::function<void(int *)> f) {
   if(rest == 0) {
     f(indices);

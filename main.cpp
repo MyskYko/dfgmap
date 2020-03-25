@@ -181,139 +181,20 @@ int main(int argc, char** argv) {
   Graph graph;
   graph.create_node("mem", "_extmem");
   graph.read(efilename);
-
   if(nverbose >= 2) {
     cout << "### environment information ###" << endl;
-    cout << "id to node name :" << endl;
-    for(auto i : graph.name2id) {
-      cout << i.second << " : " << i.first << endl;;
-    }
-    for(auto &i : graph.nodes) {
-      cout << i.first << " :" << endl;
-      for(auto j : i.second) {
-	cout << j << ", ";
-      }
-      cout << endl;
-    }
-    cout << "coms :" << endl;
-    for(auto &i : graph.edges) {
-      cout << i.first << " :" << endl;
-    }
-    for(auto h : graph.edges["com"]) {
-      for(int i : get<0>(h)) {
-	cout << i << " ";
-      }
-      cout << "-> ";
-      for(int i : get<1>(h)) {
-	cout << i << " ";
-      }
-      if(get<2>(h) > 0) {
-	cout << ": " << get<2>(h);
-      }
-      cout << endl;
-    }
+    graph.print();
   }
 
   // read formula file
-  ifstream ffile(ffilename);
-  if(!ffile) {
-    show_error("cannot open formula file");
-  }
-  string str;
   Dfg dfg;
-  while(getline(ffile, str)) {
-    string s;
-    stringstream ss(str);
-    vector<string> vs;
-    while(getline(ss, s, ' ')) {
-      vs.push_back(s);
-    }
-    if(vs.empty()) {
-      continue;
-    }
-    if(vs[0] == ".i") {
-      for(int i = 1; i < vs.size(); i++) {
-	dfg.create_input(vs[i]);
-      }
-    }
-    if(vs[0] == ".o") {
-      for(int i = 1; i < vs.size(); i++) {
-	dfg.outputnames.push_back(vs[i]);
-      }
-    }
-    if(vs[0] == ".f") {
-      while(getline(ffile, str)) {
-	vs.clear();
-	stringstream ss2(str);
-	while(getline(ss2, s, ' ')) {
-	  vs.push_back(s);
-	}
-	if(vs.empty()) {
-	  continue;
-	}
-	if(vs[0][0] == '.') {
-	  break;
-	}
-	if(vs.size() < 2) {
-	  show_error("operator must be followed by the number of operands");
-	}
-	int n;
-	try {
-	  n = stoi(vs[1]);
-	}
-	catch(...) {
-	  show_error("operator must be followed by the number of operands");
-	}
-	n = dfg.add_operator(vs[0], n);
-	for(int i = 2; i < vs.size(); i++) {
-	  if(vs[i] == "c") {
-	    dfg.make_commutative(n);
-	  }
-	  if(vs[i] == "a") {
-	    dfg.make_associative(n);
-	  }
-	}
-      }
-    }
-    if(vs[0] == ".m") {
-      while(getline(ffile, str)) {
-	vs.clear();
-	stringstream ss2(str);
-	while(getline(ss2, s, ' ')) {
-	  vs.push_back(s);
-	}
-	if(vs.empty()) {
-	  continue;
-	}
-	if(vs[0][0] == '.') {
-	  break;
-	}
-	dfg.add_multiope(vs);
-      }
-    }
-    if(vs[0] == ".n") {
-      while(getline(ffile, str)) {
-	vs.clear();
-	stringstream ss2(str);
-	while(getline(ss2, s, ' ')) {
-	  vs.push_back(s);
-	}
-	if(vs.empty()) {
-	  continue;
-	}
-	if(vs[0][0] == '.') {
-	  break;
-	}
-	dfg.create_opnode(vs);
-      }
-    }
-  }
-  ffile.close();
-
+  dfg.read(ffilename);
   if(nverbose >= 2) {
     cout << "### formula information ###" << endl;
     dfg.print();
   }
+
+  string str;
 
   // read option file
   ifstream gfile(gfilename);

@@ -1,3 +1,5 @@
+#include <fstream>
+#include <sstream>
 #include <cassert>
 #include <algorithm>
 
@@ -466,4 +468,115 @@ set<int> Dfg::output_ids() {
     ids.insert(p->id);
   }
   return ids;
+}
+
+void Dfg::read(string filename) {
+  ifstream f(filename);
+  if(!f) {
+    show_error("cannot open file", filename);
+  }
+  int r = 1;
+  string l, s;
+  stringstream ss;
+  vector<string> vs;
+  while(1) {
+    if(r) {
+      if(!getline(f, l)) {
+	break;
+      }
+      vs.clear();
+      ss.str(l);
+      ss.clear();
+      while(getline(ss, s, ' ')) {
+	vs.push_back(s);
+      }
+      if(vs.empty()) {
+	continue;
+      }
+    }
+    r = 1;
+    if(vs[0] == ".i") {
+      for(int i = 1; i < vs.size(); i++) {
+	create_input(vs[i]);
+      }
+    }
+    if(vs[0] == ".o") {
+      for(int i = 1; i < vs.size(); i++) {
+	outputnames.push_back(vs[i]);
+      }
+    }
+    if(vs[0] == ".f") {
+      while(getline(f, l)) {
+	vs.clear();
+	ss.str(l);
+	ss.clear();
+	while(getline(ss, s, ' ')) {
+	  vs.push_back(s);
+	}
+	if(vs.empty()) {
+	  continue;
+	}
+	if(vs[0][0] == '.') {
+	  r = 0;
+	  break;
+	}
+	if(vs.size() < 2) {
+	  show_error("incomplete line", l);
+	}
+	int n;
+	try {
+	  n = stoi(vs[1]);
+	}
+	catch(...) {
+	  show_error("non-integer noperands", vs[1]);
+	}
+	n = add_operator(vs[0], n);
+	for(int i = 2; i < vs.size(); i++) {
+	  if(vs[i] == "c") {
+	    make_commutative(n);
+	  }
+	  if(vs[i] == "a") {
+	    make_associative(n);
+	  }
+	}
+      }
+    }
+    if(vs[0] == ".m") {
+      while(getline(f, l)) {
+	vs.clear();
+	ss.str(l);
+	ss.clear();
+	while(getline(ss, s, ' ')) {
+	  vs.push_back(s);
+	}
+	if(vs.empty()) {
+	  continue;
+	}
+	if(vs[0][0] == '.') {
+	  r = 0;
+	  break;
+	}
+	add_multiope(vs);
+      }
+    }
+    if(vs[0] == ".n") {
+      while(getline(f, l)) {
+	vs.clear();
+	ss.str(l);
+	ss.clear();
+	while(getline(ss, s, ' ')) {
+	  vs.push_back(s);
+	}
+	if(vs.empty()) {
+	  continue;
+	}
+	if(vs[0][0] == '.') {
+	  r = 0;
+	  break;
+	}
+	create_opnode(vs);
+      }
+    }
+  }
+  f.close();
 }

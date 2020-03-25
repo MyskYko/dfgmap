@@ -14,8 +14,8 @@ public:
   std::map<std::string, std::vector<std::tuple<std::set<int>, std::set<int>, int> > > edges;
 
   void create_node(std::string type, std::string name);
-
   void read(std::string filename);
+  void print();
   
 private:
   

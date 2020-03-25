@@ -8,7 +8,7 @@ using namespace std;
 
 void Graph::create_node(string type, string name) {
   if(name2id.count(name)) {
-    show_error("node duplication : " + name);
+    show_error("node duplication", name);
   }
   nodes[type].insert(nnodes);
   name2id[name] = nnodes++;
@@ -17,9 +17,8 @@ void Graph::create_node(string type, string name) {
 void Graph::read(string filename) {
   ifstream f(filename);
   if(!f) {
-    show_error("cannot open file : " + filename);
+    show_error("cannot open file", filename);
   }
-
   int r = 1;
   string l, s;
   stringstream ss;
@@ -41,7 +40,7 @@ void Graph::read(string filename) {
     }
     r = 1;
     if(vs[0][0] != '.') {
-      show_error("line without type : " + l);
+      show_error("unexpected line", l);
     }
     string type = vs[0].substr(1);
     if(vs.size() != 1) {
@@ -62,25 +61,25 @@ void Graph::read(string filename) {
 	continue;
       }
       if(vs[0][0] == '.') {
-	r = 1;
+	r = 0;
 	break;
       }
       int i = 0;
       set<int> senders;
       for(; i < vs.size() && vs[i] != "->"; i++) {
 	if(!name2id.count(vs[i])) {
-	  show_error("unspecified node " + vs[i]);
+	  show_error("unspecified node", vs[i]);
 	}
 	senders.insert(name2id[vs[i]]);	
       }
       if(i == vs.size()) {
-	show_error("incomplete line : " + l);
+	show_error("incomplete line", l);
       }
       i++;
       set<int> recipients;
       for(; i < vs.size() && vs[i] != ":"; i++) {
 	if(!name2id.count(vs[i])) {
-	  show_error("unspecified node : " + vs[i]);
+	  show_error("unspecified node", vs[i]);
 	}
 	recipients.insert(name2id[vs[i]]);
       }
@@ -88,16 +87,16 @@ void Graph::read(string filename) {
       if(i < vs.size() && vs[i] == ":") {
 	i++;
 	if(i == vs.size()) {
-	  show_error("incomplete line : " + l);
+	  show_error("incomplete line", l);
 	}
 	try {
 	  band = stoi(vs[i]);
 	}
 	catch(...) {
-	  show_error("bandwidth must be integer : " + vs[i]);
+	  show_error("non-integer bandwidth", vs[i]);
 	}
 	if(band <= 0) {
-	  show_error("bandwidth must be more than 0 : " + vs[i]);
+	  show_error("negative bandwidth", vs[i]);
 	}
       }
       auto e = make_tuple(senders, recipients, band);
@@ -107,4 +106,34 @@ void Graph::read(string filename) {
   }
   
   f.close();
+}
+
+void Graph::print() {
+  cout << "id to node name :" << endl;
+  for(auto i : name2id) {
+    cout << i.second << " : " << i.first << endl;;
+  }
+  for(auto &i : nodes) {
+    cout << i.first << " :" << endl;
+    for(auto j : i.second) {
+      cout << j << ", ";
+    }
+    cout << endl;
+  }
+  for(auto &i : edges) {
+    cout << i.first << " :" << endl;    
+    for(auto &h : i.second) {
+      for(int j : get<0>(h)) {
+	cout << j << " ";
+      }
+      cout << "-> ";
+      for(int j : get<1>(h)) {
+	cout << j << " ";
+      }
+      if(get<2>(h) > 0) {
+	cout << ": " << get<2>(h);
+      }
+      cout << endl;
+    }
+  }
 }

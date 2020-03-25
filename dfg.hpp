@@ -17,6 +17,7 @@ public:
   std::vector<std::set<std::set<int> > > operands;
   std::vector<std::string> datanames;
 
+  void read(std::string filename);
   int add_operator(std::string s, int n);
   void make_commutative(int i);
   void make_associative(int i);
