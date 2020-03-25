@@ -19,7 +19,7 @@ public:
 
   void gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts, std::string cnfname);
 
-  void gen_image(std::string rfilename);
+  void gen_image(std::string filename);
 
   //  void reduce_image();
 
@@ -39,6 +39,7 @@ private:
   std::vector<std::set<int> > incoms;
   
   int ncycles_;
+  int nvars_;
   int yhead;
   int zhead;
 

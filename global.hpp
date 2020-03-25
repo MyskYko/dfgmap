@@ -5,17 +5,25 @@
 #include <string>
 #include <functional>
 #include <algorithm>
+#include <cctype>
 
-static inline void show_error(std::string s) {
+static void show_error(std::string s) {
   std::cout << "error : " << s << std::endl;
   std::cout << "see usage by using option -h" << std::endl;
   abort();
 }
 
-static inline void show_error(std::string s, std::string s2) {
+static void show_error(std::string s, std::string s2) {
   std::cout << "error : " << s << " \"" << s2 << "\"" << std::endl;
   std::cout << "see usage by using option -h" << std::endl;
   abort();
+}
+
+static int str2int(std::string s) {
+  if(!std::all_of(s.cbegin(), s.cend(), isdigit)) {
+    throw "non-number included";
+  }
+  return std::stoi(s);
 }
 
 static void recursive_comb(int *indices, int s, int rest, std::function<void(int *)> f) {

@@ -1,5 +1,6 @@
 #include <fstream>
 #include <sstream>
+#include <cstdio>
 
 #include "global.hpp"
 #include "graph.hpp"
@@ -14,11 +15,16 @@ int main(int argc, char** argv) {
   string gfilename = "g.txt";
   string pfilename = "_test.cnf";
   string rfilename = "_test.out";
-  
-  string solver_cmd = "minisat " + pfilename + " " + rfilename;
-  //string solver_cmd = "glucose " + pfilename + " " + rfilename;
-  //string solver_cmd = "lingeling " + pfilename + " > " + rfilename;
-  //string solver_cmd = "plingeling " + pfilename + " > " + rfilename;
+
+  vector<string> solver_cmds = {"minisat " + pfilename + " " + rfilename,
+				"glucose " + pfilename + " " + rfilename,
+				"lingeling " + pfilename + " | tee " + rfilename,
+				"plingeling " + pfilename + " | tee " + rfilename};
+
+  string pfilename_ilp = "_test.lp";
+  string rfilename_ilp = "_test.sol";
+  string solver_cmd_ilp = "cplex -c \"read " + pfilename_ilp + "\" \"set emphasis mip 1\" \"set threads 1\" \"optimize\" \"write " +  rfilename_ilp + "\"";
+
   
   int ncycles = 0;
   int nregs = 2;
@@ -28,9 +34,13 @@ int main(int argc, char** argv) {
   bool ftransform = 0;
   int ncontexts = 0;
 
+  int nsolver = 0;
   int nencode = 3;
   bool finc = 0;
   bool filp = 0;
+
+  string timeout = "1d";
+  
   int nverbose = 0;
 
   // read command
@@ -57,7 +67,7 @@ int main(int argc, char** argv) {
 	break;
       case 'n':
 	try {
-	  ncycles = stoi(argv[++i]);
+	  ncycles = str2int(argv[++i]);
 	}
 	catch(...) {
 	  show_error("-n must be followed by integer");
@@ -72,7 +82,7 @@ int main(int argc, char** argv) {
 	  break;
 	}
 	try {
-	  nregs = stoi(argv[++i]);
+	  nregs = str2int(argv[++i]);
 	}
 	catch(...) {
 	  show_error("-r should be followed by integer");
@@ -87,7 +97,7 @@ int main(int argc, char** argv) {
 	  break;
 	}
 	try {
-	  nprocs = stoi(argv[++i]);
+	  nprocs = str2int(argv[++i]);
 	}
 	catch(...) {
 	  show_error("-p should be followed by integer");
@@ -104,7 +114,7 @@ int main(int argc, char** argv) {
 	break;
       case 't':
 	try {
-	  ncontexts = stoi(argv[++i]);
+	  ncontexts = str2int(argv[++i]);
 	}
 	catch(...) {
 	  show_error("-t must be followed by integer");
@@ -116,19 +126,45 @@ int main(int argc, char** argv) {
       case 'a':
 	finc ^= 1;
 	break;
-      case 'l':
+      case 'd':
 	try {
-	  nencode = stoi(argv[++i]);
+	  nencode = str2int(argv[++i]);
 	}
 	catch(...) {
-	  show_error("-l must be followed by integer");
+	  show_error("-d must be followed by integer");
 	}
 	if(nencode < 0 || nencode > 4) {
-	  show_error("the number of cycles must be between 0 and 4");
+	  show_error("the encoding must be between 0 and 4");
+	}
+	break;
+      case 's':
+	try {
+	  nsolver = str2int(argv[++i]);
+	}
+	catch(...) {
+	  show_error("-s must be followed by integer");
+	}
+	if(nsolver < 0 || nsolver >= solver_cmds.size()) {
+	  show_error("SAT solver must be more than 0 and less than", to_string(solver_cmds.size()));
 	}
 	break;
       case 'i':
 	filp ^= 1;
+	break;
+      case 'l':
+	try {
+	  timeout = argv[++i];
+	  char c = timeout.back();
+	  if(c == 's' || c == 'm' || c == 'h' || c == 'd') {
+	    str2int(timeout.substr(0, timeout.size()-1));
+	  }
+	  else {
+	    str2int(timeout);
+	  }
+	}
+	catch(...) {
+	  show_error("-l must be followed by timeout duration");
+	}
 	break;
       case 'v':
 	if(i+1 >= argc || argv[i+1][0] == '-') {
@@ -136,7 +172,7 @@ int main(int argc, char** argv) {
 	  break;
 	}
 	try {
-	  nverbose = stoi(argv[++i]);
+	  nverbose = str2int(argv[++i]);
 	}
 	catch(...) {
 	  show_error("-v should be followed by integer");
@@ -155,17 +191,24 @@ int main(int argc, char** argv) {
 	cout << "\t-c       : toggle transforming dataflow [default = " << ftransform << "]" << endl;
 	cout << "\t-t <int> : the number of contexts for pipeline (0 means no pipelining) [default = " << ncontexts << "]" << endl;
 	cout << "\t-a       : toggle incremental synthesis [default = " << finc << "]" << endl;
-	cout << "\t-l <int> : the type of at most one encoding [default = " << nencode << "]" << endl;
+	cout << "\t-d <int> : the type of at most one encoding [default = " << nencode << "]" << endl;
 	cout << "\t           \t0 : naive" << endl;
 	cout << "\t           \t1 : commander" << endl;
 	cout << "\t           \t2 : binary" << endl;
 	cout << "\t           \t3 : bimander half" << endl;
-	cout << "\t           \t4 : bimander root" << endl;	
+	cout << "\t           \t4 : bimander root" << endl;
+	cout << "\t-s <int> : SAT solver [default = " << nsolver << "]" << endl;
+	cout << "\t           \t0 : minisat" << endl;
+	cout << "\t           \t1 : glucose" << endl;
+	cout << "\t           \t2 : lingeling" << endl;
+	cout << "\t           \t3 : plingeling" << endl;
 	cout << "\t-i       : toggle using ILP solver instead of SAT solver [default = " << filp << "]" << endl;
+	cout << "\t-l <str> : timeout duration (0 means no time limit) [default = " << timeout << "]" << endl;
 	cout << "\t-v <int> : the level of verbosing information [default = " << nverbose << "]" << endl;
 	cout << "\t           \t0 : nothing" << endl;
 	cout << "\t           \t1 : results" << endl;
 	cout << "\t           \t2 : settings and results" << endl;
+	cout << "\t           \t3 : settings, solver outputs, and results" << endl;
 	return 0;
       default:
 	show_error("invalid option " + string(argv[i]));
@@ -299,10 +342,11 @@ int main(int argc, char** argv) {
     cout << "to run synthesis, please specify the number of cycles by using option -n" << endl;
     return 0;
   }
+  string solver_cmd = solver_cmds[nsolver];
   if(filp) {
-    pfilename = "_test.lp";
-    rfilename = "_test.sol";
-    solver_cmd = "cplex -c \"read " + pfilename + "\" \"set emphasis mip 1\" \"set threads 1\" \"optimize\" \"write " +  rfilename + "\"";
+    pfilename = pfilename_ilp;
+    rfilename = rfilename_ilp;
+    solver_cmd = solver_cmd_ilp;
   }
 
   // solve
@@ -310,16 +354,27 @@ int main(int argc, char** argv) {
     cout << "ncycles : " << ncycles << endl;
     cout << "ndata : " << dfg.get_ndata() << endl;
     cnf.gen_cnf(ncycles, nregs, nprocs, fextmem, ncontexts, pfilename);
-    string cmd = "timeout 1d " + solver_cmd;
+    string cmd;
+    if(timeout != "0") {
+      cmd = "timeout 1d ";
+    }
+    cmd += solver_cmd;
+    if(nverbose < 3) {
+      cmd += " > /dev/null 2>&1";
+    }
+    remove(rfilename.c_str());
     int r = system(cmd.c_str());
     r = r >> 8;
     if(r == 124) {
       cout << "Timeout" << endl;
       return 0;
     }
-    ifstream rfile(rfilename);
+    if(r > 124) {
+      show_error("solver command", cmd);
+    }
+    ifstream f(rfilename);
     if(filp) {
-      if(!rfile) {
+      if(!f) {
 	std::cout << "No solution" << std::endl;
 	if(!finc) {
 	  return 0;
@@ -332,15 +387,14 @@ int main(int argc, char** argv) {
 	break;
       }
     }
-    if(!rfile) {
-      show_error("cannot open result file");
+    if(!f) {
+      show_error("cannot open result file", rfilename);
     }
     r = 0;
-    string str;
-    while(getline(rfile, str)) {
+    string l;
+    while(getline(f, l)) {
       string s;
-      stringstream ss(str);
-      vector<string> vs;
+      stringstream ss(l);
       getline(ss, s, ' ');
       if(s == "SAT" || s == "1" || s == "-1") {
 	r = 1;
@@ -360,6 +414,7 @@ int main(int argc, char** argv) {
 	}
       }
     }
+    f.close();
     // show results
     if(r) {
       std::cout << "Solution found" << std::endl;
@@ -374,11 +429,6 @@ int main(int argc, char** argv) {
     ncycles++;
   }
 
-  if(filp) {
-    return 0;
-    // TODO read results
-  }
-    
   cnf.gen_image(rfilename);
 
   //  cnf.reduce_image();

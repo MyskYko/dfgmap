@@ -1,5 +1,6 @@
 #include <fstream>
 #include <sstream>
+#include <cstdlib>
 
 #include "global.hpp"
 #include "cnf.hpp"
@@ -480,6 +481,8 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
   
   f.close();
 
+  nvars_ = nvars;
+
   if(filp) {
     return;
   }
@@ -489,34 +492,91 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
   system(cmd.c_str());
 }
 
-void Cnf::gen_image(string rfilename) {
-  vector<int> results;
-  ifstream rfile(rfilename);
-  if(!rfile) {
-    show_error("cannot open result file");
+void Cnf::gen_image(string filename) {
+  vector<bool> results(nvars_);
+  ifstream f(filename);
+  if(!f) {
+    show_error("cannot open result file", filename);
   }
-  string str;
-  while(getline(rfile, str)) {
+  string l;
+  while(getline(f, l)) {
+    if(filp) {
+      string::size_type i = l.find("<");
+      string::size_type j = l.find(">");
+      if(i == string::npos || j == string::npos || i > j) {
+	continue;
+      }
+      l = l.substr(i+1, j-i-1);
+      if(l == "variables") {
+	while(getline(f, l)) {
+	  i = l.find("<");
+	  j = l.find(">");
+	  if(i == string::npos || j == string::npos || i > j) {
+	    continue;
+	  }
+	  l = l.substr(i+1, j-i-1);
+	  if(l == "/variables") {
+	    break;
+	  }
+	  string sname, svalue;
+	  string s;
+	  stringstream ss(l);
+	  try {
+	    while(getline(ss, s, ' ')) {
+	      if(s.find("=") == string::npos) {
+		continue;
+	      }
+	      stringstream ss2(s);
+	      getline(ss2, s, '=');
+	      if(s == "name") {
+		getline(ss2, s, '=');
+		sname = s.substr(2, s.size()-3);
+	      }
+	      if(s == "value") {
+		getline(ss2, s, '=');
+		svalue = s.substr(1, s.size()-2);
+	      }
+	    }
+	    if(stoi(svalue)) {
+	      results[stoi(sname)-1] = 1;
+	    }
+	  }
+	  catch(...) {
+	    show_error("unexpected line", l);
+	  }
+	}
+      }
+      continue;
+    }
     string s;
-    stringstream ss(str);
-    vector<string> vs;
+    stringstream ss(l);
     getline(ss, s, ' ');
     if(s == "1" || s == "-1") {
-      results.push_back(stoi(s));
+      if(s == "1") {
+	results[0] = 1;
+      }
       while(getline(ss, s, ' ')) {
 	try {
-	  results.push_back(stoi(s));
-	} catch(...) {
-	  show_error("wrong formatted result file");
+	  int i = stoi(s);
+	  if(i > 0) {
+	    results[i-1] = 1;
+	  }
+	}
+	catch(...) {
+	  show_error("unexpected word", s);
 	}
       }
     }
     else if(s == "v") {
       while(getline(ss, s, ' ')) {
 	try {
-	  results.push_back(stoi(s));
-	} catch(...) {
-	  show_error("wrong formatted result file");
+	  int i = stoi(s);
+	  if(i > 0) {
+	    results[i-1] = 1;
+	  }
+	}
+	catch(...) {
+	  show_error("unexpected word", s);
 	}
       }
     }
@@ -526,7 +586,7 @@ void Cnf::gen_image(string rfilename) {
   for(int k = 0; k < ncycles_; k++) {
     for(int j = 0; j < nnodes; j++) {
       for(int i = 0; i < ndata; i++) {
-	if(results[k*nnodes*ndata + j*ndata + i] > 0) {
+	if(results[k*nnodes*ndata + j*ndata + i]) {
 	  image[k][j].push_back(i);
 	}
       }
@@ -535,7 +595,7 @@ void Cnf::gen_image(string rfilename) {
   for(int k = 0; k < ncycles_; k++) {
     for(int h = 0; h < ncoms; h++) {
       for(int i = 0; i < ndata; i++) {
-	if(results[yhead + k*ncoms*ndata + h*ndata + i] > 0) {
+	if(results[yhead + k*ncoms*ndata + h*ndata + i]) {
 	  image[k][nnodes+h].push_back(i);
 	}
       }
