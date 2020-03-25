@@ -5,35 +5,60 @@
 
 using namespace std;
 
-int Dfg::add_operator(string op, int n) {
-  operators.push_back(op);
-  noperands.push_back(n);
-  assert(operators.size() == noperands.size());
-  return operators.size() - 1;
+int Dfg::add_operator(string s, int n) {
+  opr * p = new opr;
+  p->s = s;
+  p->n = n;
+  p->attr = 0;
+  oprs.push_back(p);
+  return oprs.size() - 1;
 }
 
 int Dfg::optype(string s) {
-  auto it = find(operators.begin(), operators.end(), s);
-  if(it == operators.end()) {
-    return -1;
+  for(int i = 0; i < oprs.size(); i++) {
+    if(oprs[i]->s == s) {
+      return i;
+    }
   }
-  return distance(operators.begin(), it);
+  return -1;
 }
 
 string Dfg::typeop(int i) {
-  if(i < 0 || i >= operators.size()) {
+  if(i < 0 || i >= oprs.size()) {
     show_error("no operator at " + to_string(i) );
   }
-  return operators[i];
+  return oprs[i]->s;
 }
 
-int Dfg::fcompressible(int i) {
-  auto it = find(vcompressible.begin(), vcompressible.end(), i);
-  if(it == vcompressible.end()) {
-    return 0;
+int Dfg::fcommutative(int i) {
+  if(i < 0 || i >= oprs.size()) {
+    show_error("no operator at " + to_string(i) );
   }
-  assert(noperands[i] == 2);
-  return 1;
+  return oprs[i]->attr % 2;
+}
+
+int Dfg::fassociative(int i) {
+  if(i < 0 || i >= oprs.size()) {
+    show_error("no operator at " + to_string(i) );
+  }
+  return (oprs[i]->attr >> 1) % 2;
+}
+
+void Dfg::make_commutative(int i) {
+  if(fcommutative(i)) {
+    show_error("operator " + to_string(i) + " is already commutative");
+  }
+  oprs[i]->attr += 1;
+}
+
+void Dfg::make_associative(int i) {
+  if(fassociative(i)) {
+    show_error("operator " + to_string(i) + " is already associative");
+  }
+  if(oprs[i]->n != 2) {
+    show_error("associative operator must have 2 inputs");
+  }
+  oprs[i]->attr += 2;
 }
 
 void Dfg::create_input(string name) {
@@ -43,6 +68,33 @@ void Dfg::create_input(string name) {
   p->id = ninputs++;
   data_name2opnode[name] = p;
   opnodes.push_back(p);
+}
+
+Dfg::opnode *Dfg::create_multiope(vector<string> &vs, int &pos) {
+  if(pos >= vs.size()) {
+    show_error("formula file has an incomplete line");
+  }
+  if(optype(vs[pos]) < 0) {
+    return NULL;
+  }
+  opnode *p = new opnode;
+  p->id = 1;
+  p->type = optype(vs[pos]);
+  for(int i = 0; i < oprs[p->type]->n; i++) {
+    opnode *c = create_multiope(vs, ++pos);
+    if(c) {
+      p->id = 0;
+    }
+    p->vc.push_back(c);
+  }
+  opnodes.push_back(p);
+  return p;
+}
+
+void Dfg::add_multiope(vector<string> &vs) {
+  int pos = 0;
+  opnode * p = create_multiope(vs, pos);
+  multiopes.push_back(p);
 }
 
 Dfg::opnode *Dfg::create_opnode(vector<string> &vs, int &pos) {
@@ -59,7 +111,7 @@ Dfg::opnode *Dfg::create_opnode(vector<string> &vs, int &pos) {
   opnode *p = new opnode;
   p->id = -1;
   p->type = optype(vs[pos]);
-  for(int i = 0; i < noperands[p->type]; i++) {
+  for(int i = 0; i < oprs[p->type]->n; i++) {
     opnode *c = create_opnode(vs, ++pos);
     p->vc.push_back(c);
   }
@@ -115,7 +167,7 @@ void Dfg::compress_opnode(opnode *p) {
   if(p->type < 0) {
     return;
   }
-  if(fcompressible(p->type)) {
+  if(fassociative(p->type)) {
     vector<opnode *> vcn;
     for(int i = 0; i < p->vc.size(); i++) {
       auto c = p->vc[i];
@@ -149,22 +201,24 @@ void Dfg::gen_operands_opnode(opnode *p) {
   if(p->id != -1) {
     return;
   }
-  multiset<int> cids;
+  vector<int> cids;
   for(auto c : p->vc) {
     gen_operands_opnode(c);
-    cids.insert(c->id);
+    cids.push_back(c->id);
   }
-  pair<int, multiset<int> > key = make_pair(p->type, cids);
+  if(fcommutative(p->type)) {
+    sort(cids.begin(), cids.end());
+  }
+  pair<int, vector<int> > key = make_pair(p->type, cids);
   if(unique[key]) {
     p->id = unique[key];
     return;
   }
-  if(!fcompressible(p->type)) {
-    set<set<int> > ss;
-    set<int> s(cids.begin(), cids.end());
-    ss.insert(s);
+  if(!fassociative(p->type)) {
+    set<vector<int> > sv;
+    sv.insert(cids);
     optypes.push_back(p->type);
-    operands.push_back(ss);
+    voperands.push_back(sv);
     string dataname;
     dataname += typeop(p->type);
     dataname += "(";
@@ -180,49 +234,57 @@ void Dfg::gen_operands_opnode(opnode *p) {
     p->id = unique[key];    
     return;
   }
+  if(!fcommutative(p->type)) {
+    
+    assert(0);
+  }
   for(int i = 2; i <= cids.size(); i++) {
-    foreach_comb(cids.size(), i, [&](int *indexes) {
-				   multiset<int> sub;
+    foreach_comb(cids.size(), i, [&](int *indices) {
+				   vector<int> sub;
 				   for(int k = 0; k < i; k++) {
-				     sub.insert(p->vc[indexes[k]]->id);
+				     sub.push_back(p->vc[indices[k]]->id);
 				   }
-				   pair<int, multiset<int> > keysub = make_pair(p->type, sub);
+				   sort(sub.begin(), sub.end());
+				   pair<int, vector<int> > keysub = make_pair(p->type, sub);
 				   if(unique[keysub]) {
 				     return;
 				   }
-				   set<set<int> > ss;
+				   set<vector<int> > sv;
 				   for(int j = 1; j < 1 << (i-1); j++) {
-				     set<int> s;
-				     multiset<int> a;
-				     multiset<int> b;
+				     vector<int> v;
+				     vector<int> a;
+				     vector<int> b;
 				     int j_ = j;
 				     for(int k = 0; k < i; k++) {
 				       if(j_ % 2) {
-					 a.insert(p->vc[indexes[k]]->id);
+					 a.push_back(p->vc[indices[k]]->id);
 				       }
 				       else {
-					 b.insert(p->vc[indexes[k]]->id);
+					 b.push_back(p->vc[indices[k]]->id);
 				       }
 				       j_ = j_ >> 1;
 				     }
 				     if(a.size() == 1) {
-				       s.insert(*a.begin());
+				       v.push_back(a[0]);
 				     }
 				     else {
-				       pair<int, multiset<int> > keya = make_pair(p->type, a);
-				       s.insert(unique[keya]);
+				       sort(a.begin(), a.end());
+				       pair<int, vector<int> > keya = make_pair(p->type, a);
+				       v.push_back(unique[keya]);
 				     }
 				     if(b.size() == 1) {
-				       s.insert(*b.begin());
+				       v.push_back(b[0]);
 				     }
 				     else {
-				       pair<int, multiset<int> > keyb = make_pair(p->type, b);
-				       s.insert(unique[keyb]);
+				       sort(b.begin(), b.end());
+				       pair<int, vector<int> > keyb = make_pair(p->type, b);
+				       v.push_back(unique[keyb]);
 				     }
-				     ss.insert(s);
+				     sort(v.begin(), v.end());
+				     sv.insert(v);
 				   }
 				   optypes.push_back(p->type);
-				   operands.push_back(ss);
+				   voperands.push_back(sv);
 				   string dataname;
 				   for(auto id : sub) {
 				     dataname += datanames[id];
@@ -244,8 +306,8 @@ void Dfg::gen_operands() {
   ndata = ninputs;
   optypes.clear();
   optypes.resize(ndata);
-  operands.clear();
-  operands.resize(ndata);
+  voperands.clear();
+  voperands.resize(ndata);
   unique.clear();
   for(auto s : outputnames) {
     opnode * p = data_name2opnode[s];
@@ -254,50 +316,90 @@ void Dfg::gen_operands() {
     }
     gen_operands_opnode(p);
   }
-}
-
-
-void Dfg::support_MAC() {
-  assert(optypes.size() == operands.size());
-  int n = optypes.size();
-  vector<set<set<int> > > new_operands(n);
-  for(int i = 0; i < n; i++) {
-    if(optypes[i] != optype("+")) {
-      continue;
+  fmulti = 0;
+  operands.clear();
+  operands.resize(voperands.size());
+  support_multiope();
+  for(int i = 0; i < voperands.size(); i++) {
+    for(auto &v : voperands[i]) {
+      set<int> s(v.begin(), v.end());
+      operands[i].insert(s);
     }
-    for(auto s : operands[i]) {
-      assert(s.size() == 2);
-      auto it = s.begin();
-      int a = *it;
-      it++;
-      int b = *it;
-      if(optypes[a] == optype("*")) {
-	for(auto cs : operands[a]) {
-	  assert(cs.size() == 2);
-	  set<int> new_s;
-	  for(auto cc : cs) {
-	    new_s.insert(cc);
-	  }
-	  new_s.insert(b);
-	  new_operands[i].insert(new_s);
-	}
-      }
-      if(optypes[b] == optype("*")) {
-	for(auto cs : operands[b]) {
-	  assert(cs.size() == 2);
-	  set<int> new_s;
-	  for(auto cc : cs) {
-	    new_s.insert(cc);
-	  }
-	  new_s.insert(a);
-	  new_operands[i].insert(new_s);
-	}
-      }      
+    if(!fmulti && operands[i].size() > 1) {
+      fmulti = 1;
     }
   }
-  for(int i = 0; i < n; i++) {
-    for(auto s : new_operands[i]) {
-      operands[i].insert(s);
+}
+
+int Dfg::support_multiope_rec(int id, opnode *ope, vector<set<int> > &vs) {
+  if(ope == NULL) {
+    for(auto &s : vs) {
+      s.insert(id);
+    }
+    return 1;
+  }
+  if(optypes[id] != ope->type) {
+    return 0;
+  }
+  set<set<int> > ss;
+  for(auto &v : voperands[id]) {
+    if(fcommutative(ope->type) && !ope->id) {
+      foreach_perm(oprs[ope->type]->n, [&](int *indices) {
+			 vector<set<int> > vs2(1);
+			 for(int i = 0; i < oprs[ope->type]->n; i++) {
+			   int r = support_multiope_rec(v[indices[i]], ope->vc[i], vs2);
+			   if(!r) {
+			     return;
+			   }
+			 }
+			 ss.insert(vs2.begin(), vs2.end());
+		       });
+    }
+    else {
+      vector<set<int> > vs2(1);
+      int r = 0;
+      for(int i = 0; i < oprs[ope->type]->n; i++) {
+	r = support_multiope_rec(v[i], ope->vc[i], vs2);
+	if(!r) {
+	  break;
+	}
+      }
+      if(!r) {
+	continue;
+      }
+      ss.insert(vs2.begin(), vs2.end());
+    }
+  }
+  if(ss.empty()) {
+    return 0;
+  }
+  if(ss.size() == 1) {
+    for(auto &s : vs) {
+      s.insert(ss.begin()->begin(), ss.begin()->end());
+    }
+    return 1;
+  }
+  vector<set<int> > vs_ = vs;
+  vs.clear();
+  for(auto &s2 : ss) {
+    for(auto s : vs_) {
+      s.insert(s2.begin(), s2.end());
+      vs.push_back(s);
+    }
+  }
+  return 1;
+}
+
+void Dfg::support_multiope() {
+  assert(optypes.size() == voperands.size());
+  for(auto multiope : multiopes) {
+    for(int i = 0; i < optypes.size(); i++) {
+      vector<set<int> > vs(1);
+      int r;
+      r = support_multiope_rec(i, multiope, vs);
+      if(r) {
+	operands[i].insert(vs.begin(), vs.end());
+      }
     }
   }
 }

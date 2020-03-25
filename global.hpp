@@ -11,20 +11,33 @@ static inline void show_error(std::string s) {
   abort();
 }
 
-static void recursive_comb(int *indexes, int s, int rest, std::function<void(int *)> f) {
-  if (rest == 0) {
-    f(indexes);
-  } else {
-    if (s < 0) return;
-    recursive_comb(indexes, s - 1, rest, f);
-    indexes[rest - 1] = s;
-    recursive_comb(indexes, s - 1, rest - 1, f);
+static void recursive_comb(int *indices, int s, int rest, std::function<void(int *)> f) {
+  if(rest == 0) {
+    f(indices);
+  }
+  else{
+    if(s < 0) {
+      return;
+    }
+    recursive_comb(indices, s - 1, rest, f);
+    indices[rest - 1] = s;
+    recursive_comb(indices, s - 1, rest - 1, f);
   }
 }
 
 static void foreach_comb(int n, int k, std::function<void(int *)> f) {
-  int indexes[k];
-  recursive_comb(indexes, n - 1, k, f);
+  int indices[k];
+  recursive_comb(indices, n - 1, k, f);
+}
+
+static void foreach_perm(int n, std::function<void(int *)> f) {
+  int indices[n];
+  for(int i = 0; i < n; i++) {
+    indices[i] = i;
+  }
+  do {
+    f(indices);
+  } while (std::next_permutation(indices, indices + n));
 }
 
 static int integer_log2(int n) { // wrap up

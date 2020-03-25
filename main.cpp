@@ -29,7 +29,6 @@ int main(int argc, char** argv) {
   int nprocs = 1;
   
   int fextmem = 0;
-  int fmac = 0;
   int ftransform = 0;
   int npipeline = 0;
 
@@ -104,9 +103,6 @@ int main(int argc, char** argv) {
       case 'x':
 	fextmem ^= 1;
 	break;
-      case 'm':
-	fmac ^= 1;
-	break;
       case 'c':
 	ftransform ^= 1;
 	break;
@@ -160,7 +156,6 @@ int main(int argc, char** argv) {
 	cout << "\t-r <int> : the number of registers in each PE (just -r means no limit) [default = " << nregs << "]" << endl;
 	cout << "\t-u <int> : the number of processors in each PE (just -u means no limit) [default = " << nprocs << "]" << endl;
 	cout << "\t-x       : toggle enabling external memory to store intermediate values [default = " << fextmem << "]" << endl;
-	cout << "\t-m       : toggle using MAC operation [default = " << fmac << "]" << endl;
 	cout << "\t-c       : toggle transforming dataflow [default = " << ftransform << "]" << endl;
 	cout << "\t-t <int> : the number of contexts for pipeline (0 means no pipelining) [default = " << npipeline << "]" << endl;
 	cout << "\t-a       : toggle incremental synthesis [default = " << finc << "]" << endl;
@@ -362,10 +357,29 @@ int main(int argc, char** argv) {
 	}
 	n = dfg.add_operator(vs[0], n);
 	for(int i = 2; i < vs.size(); i++) {
-	  if(vs[i] == "compressible") {
-	    dfg.vcompressible.push_back(n);
+	  if(vs[i] == "c") {
+	    dfg.make_commutative(n);
+	  }
+	  if(vs[i] == "a") {
+	    dfg.make_associative(n);
 	  }
 	}
+      }
+    }
+    if(vs[0] == ".m") {
+      while(getline(ffile, str)) {
+	vs.clear();
+	stringstream ss2(str);
+	while(getline(ss2, s, ' ')) {
+	  vs.push_back(s);
+	}
+	if(vs.empty()) {
+	  continue;
+	}
+	if(vs[0][0] == '.') {
+	  break;
+	}
+	dfg.add_multiope(vs);
       }
     }
     if(vs[0] == ".n") {
@@ -467,9 +481,6 @@ int main(int argc, char** argv) {
 
   // generate operand list
   dfg.gen_operands();
-  if(fmac) {
-    dfg.support_MAC();
-  }
   assert(dfg.ndata == dfg.operands.size());
 
   if(nverbose >= 2) {
@@ -490,7 +501,7 @@ int main(int argc, char** argv) {
   // instanciate problem generator
   Cnf cnf = Cnf(pe_nodes, mem_nodes, coms, dfg.ninputs, dfg.output_ids(), assignments, dfg.operands);
   cnf.nencode = nencode;
-  if(fmac || ftransform) {
+  if(dfg.fmulti) {
     cnf.fmultiop = 1;
   }
   if(filp) {

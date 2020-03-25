@@ -51,10 +51,10 @@ void Cnf::write_clause(int &nclauses, vector<int> &vLits, ofstream &fcnf) {
 
 void Cnf::amo_naive(int &nclauses, vector<int> &vLits, ofstream &fcnf) {
   vector<int> vLits2;
-  foreach_comb(vLits.size(), 2, [&](int *indexes) {
+  foreach_comb(vLits.size(), 2, [&](int *indices) {
 				  vLits2.clear();
-				  vLits2.push_back(-vLits[indexes[0]]);
-				  vLits2.push_back(-vLits[indexes[1]]);
+				  vLits2.push_back(-vLits[indices[0]]);
+				  vLits2.push_back(-vLits[indices[1]]);
 				  write_clause(nclauses, vLits2, fcnf);
 				});
 }
