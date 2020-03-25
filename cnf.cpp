@@ -8,12 +8,12 @@
 
 using namespace std;
 
-Cnf::Cnf(vector<int> pe_nodes, vector<int> mem_nodes, vector<tuple<vector<int>, vector<int>, int> > coms, int ninputs, set<int> output_ids, map<int, set<int> > assignments, vector<set<set<int> > > operands) :pe_nodes(pe_nodes), mem_nodes(mem_nodes), coms(coms), ninputs(ninputs), output_ids(output_ids), assignments(assignments), operands(operands)
+Cnf::Cnf(set<int> pes, set<int> mems, vector<tuple<set<int>, set<int>, int> > coms, int ninputs, set<int> output_ids, map<int, set<int> > assignments, vector<set<set<int> > > operands) :pes(pes), mems(mems), coms(coms), ninputs(ninputs), output_ids(output_ids), assignments(assignments), operands(operands)
 {
   fmultiop = 0;
   nencode = 0;
   filp = 0;
-  nnodes = pe_nodes.size() + mem_nodes.size();
+  nnodes = pes.size() + mems.size();
   ndata = operands.size();
   ncoms = coms.size();
   incoms.resize(nnodes);
@@ -339,7 +339,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int npipeline
   // conditions for operation
   fcnf << (filp? "\\": "c") << " conditions for operation" << endl;
   for(int k = 1; k < ncycles; k++) {
-    for(int j : pe_nodes) {
+    for(int j : pes) {
       for(int i = 0; i < ndata; i++) {
 	if(fmultiop) {
 	  int nvars_ = nvars;
@@ -385,7 +385,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int npipeline
 	}
       }
     }
-    for(int j : mem_nodes) {
+    for(int j : mems) {
       for(int i = 0; i < ndata; i++) {
 	vLits.clear();
 	vLits.push_back(-(zhead + k*nnodes*ndata + j*ndata + i + 1));
@@ -398,7 +398,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int npipeline
   fcnf << (filp? "\\": "c") << " at most 1 or K" << endl;
   for(int t = 0; t < npipeline; t++) {
     // reg
-    for(int j : pe_nodes) {
+    for(int j : pes) {
       vLits.clear();
       for(int k = t+1; k < ncycles; k += npipeline) {
 	for(int i = 0; i < ndata; i++) {
@@ -429,7 +429,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int npipeline
       }
     }
     // ope
-    for(int j : pe_nodes) {
+    for(int j : pes) {
       vLits.clear();
       for(int k = t+1; k < ncycles; k += npipeline) {
 	for(int i = 0; i < ndata; i++) {

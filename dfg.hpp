@@ -1,5 +1,5 @@
-#ifndef OP_HPP
-#define OP_HPP
+#ifndef DFG_HPP
+#define DFG_HPP
 
 #include <string>
 #include <vector>
@@ -63,5 +63,5 @@ private:
   int support_multiope_rec(int id, opnode *ope, std::vector<std::set<int> > &vs);
 };
 
-#endif // OP_HPP
+#endif // DFG_HPP
 

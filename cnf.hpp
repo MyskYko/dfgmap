@@ -13,7 +13,7 @@ public:
   int filp;
   std::vector<std::vector<std::vector<int> > > image;
 
-  Cnf(std::vector<int> pe_nodes, std::vector<int> mem_nodes, std::vector<std::tuple<std::vector<int>, std::vector<int>, int> > coms, int ninputs, std::set<int> output_ids, std::map<int, std::set<int> > assignments, std::vector<std::set<std::set<int> > > operands);
+  Cnf(std::set<int> pes, std::set<int> mem_nodes, std::vector<std::tuple<std::set<int>, std::set<int>, int> > coms, int ninputs, std::set<int> output_ids, std::map<int, std::set<int> > assignments, std::vector<std::set<std::set<int> > > operands);
 
   void gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int npipeline, std::string cnfname);
 
@@ -27,9 +27,9 @@ private:
   int ninputs;
   int ncoms;
 
-  std::vector<int> pe_nodes;
-  std::vector<int> mem_nodes;
-  std::vector<std::tuple<std::vector<int>, std::vector<int>, int> > coms;
+  std::set<int> pes;
+  std::set<int> mems;
+  std::vector<std::tuple<std::set<int>, std::set<int>, int> > coms;
   std::set<int> output_ids;
   std::map<int, std::set<int> > assignments;
   std::vector<std::set<std::set<int> > > operands;

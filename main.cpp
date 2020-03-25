@@ -7,11 +7,11 @@
 #include <tuple>
 
 #include "global.hpp"
+#include "graph.hpp"
 #include "dfg.hpp"
 #include "cnf.hpp"
 
 using namespace std;
-
 
 int main(int argc, char** argv) {
   string efilename = "e.txt";
@@ -178,129 +178,37 @@ int main(int argc, char** argv) {
   }
 
   // read environment file
-  ifstream efile(efilename);
-  if(!efile) {
-    show_error("cannot open environment file");
-  }
-  int nnodes = 0;
-  map<string, int> node_name2id;
-  vector<int> pe_nodes;
-  vector<int> mem_nodes;
-  vector<tuple<vector<int>, vector<int>, int> > coms;
-  // external memory
-  string extmem_name = "_extmem";
-  node_name2id[extmem_name] = nnodes;
-  mem_nodes.push_back(nnodes);
-  nnodes++;
-  string str;
-  while(getline(efile, str)) {
-    string s;
-    stringstream ss(str);
-    vector<string> vs;
-    while(getline(ss, s, ' ')) {
-      vs.push_back(s);
-    }
-    if(vs.empty()) {
-      continue;
-    }
-    if(vs[0] == ".pe") {
-      for(int i = 1; i < vs.size(); i++) {
-	node_name2id[vs[i]] = nnodes;
-	pe_nodes.push_back(nnodes);
-	nnodes++;
-      }
-    }
-    if(vs[0] == ".mem") {
-      for(int i = 1; i < vs.size(); i++) {
-	node_name2id[vs[i]] = nnodes;
-	mem_nodes.push_back(nnodes);
-	nnodes++;
-      }
-    }
-    if(vs[0] == ".com") {
-      while(getline(efile, str)) {
-	vs.clear();
-	stringstream ss2(str);
-	while(getline(ss2, s, ' ')) {
-	  vs.push_back(s);
-	}
-	if(vs.empty()) {
-	  continue;
-	}
-	if(vs[0][0] == '.') {
-	  break;
-	}
-	int i = 0;
-	vector<int> senders;
-	while(i < vs.size() && vs[i] != "->") {
-	  if(!node_name2id.count(vs[i])) {
-	    show_error("node " + vs[i] + " unspecified");
-	  }
-	  senders.push_back(node_name2id[vs[i]]);
-	  i++;
-	}
-	if(i == vs.size()) {
-	  show_error("there is an incomplete line in .com");
-	}
-	i++;
-	vector<int> recipients;
-	while(i < vs.size() && vs[i] != ":") {
-	  if(!node_name2id.count(vs[i])) {
-	    show_error("node " + vs[i] + " unspecified");
-	  }
-	  recipients.push_back(node_name2id[vs[i]]);
-	  i++;
-	}
-	int band = -1;
-	if(vs[i] == ":") {
-	  i++;
-	  if(i == vs.size()) {
-	    show_error("there is an incomplete line in .com");
-	  }
-	  try {
-	    band = stoi(vs[i]);
-	  }
-	  catch(...) {
-	    show_error("bandwidth must be integer");
-	  }
-	  if(band <= 0) {
-	    show_error("bandwidth must be more than 0");
-	  }
-	}
-	auto com = make_tuple(senders, recipients, band);
-	coms.push_back(com);
-      }
-    }
-  }
-  efile.close();
-  
+  Graph graph;
+  graph.create_node("mem", "_extmem");
+  graph.read(efilename);
+
   if(nverbose >= 2) {
     cout << "### environment information ###" << endl;
     cout << "id to node name :" << endl;
-    for(auto i : node_name2id) {
+    for(auto i : graph.name2id) {
       cout << i.second << " : " << i.first << endl;;
     }
-    cout << "PEs :" << endl;
-    for(int i : pe_nodes) {
-      cout << i << ",";
+    for(auto &i : graph.nodes) {
+      cout << i.first << " :" << endl;
+      for(auto j : i.second) {
+	cout << j << ", ";
+      }
+      cout << endl;
     }
-    cout << endl;
-    cout << "Mems :" << endl;
-    for(int i : mem_nodes) {
-      cout << i << ",";
+    cout << "coms :" << endl;
+    for(auto &i : graph.edges) {
+      cout << i.first << " :" << endl;
     }
-    cout << endl;
-    cout << "communication paths :" << endl;
-    for(auto com : coms) {
-      for(int i : get<0>(com)) {
+    for(auto h : graph.edges["com"]) {
+      for(int i : get<0>(h)) {
 	cout << i << " ";
       }
       cout << "-> ";
-      for(int i : get<1>(com)) {
+      for(int i : get<1>(h)) {
 	cout << i << " ";
       }
-      if(get<2>(com) > 0) {
-	cout << ": " << get<2>(com);
+      if(get<2>(h) > 0) {
+	cout << ": " << get<2>(h);
       }
       cout << endl;
     }
@@ -311,6 +219,7 @@ int main(int argc, char** argv) {
   if(!ffile) {
     show_error("cannot open formula file");
   }
+  string str;
   Dfg dfg;
   while(getline(ffile, str)) {
     string s;
@@ -441,11 +350,11 @@ int main(int argc, char** argv) {
 	  if(vs[0][0] == '.') {
 	    break;
 	  }
-	  if(!node_name2id.count(vs[0])) {
+	  if(!graph.name2id.count(vs[0])) {
 	    show_error("node " + vs[0] + " does not exist");
 	  }
-	  int id = node_name2id[vs[0]];
-	  if(find(mem_nodes.begin(), mem_nodes.end(), id) == mem_nodes.end()) {
+	  int id = graph.name2id[vs[0]];
+	  if(find(graph.nodes["mem"].begin(), graph.nodes["mem"].end(), id) == graph.nodes["mem"].end()) {
 	    show_error("node " + vs[0] + " is not Mem");
 	  }
 	  sinputs.clear();
@@ -499,7 +408,7 @@ int main(int argc, char** argv) {
   }
   
   // instanciate problem generator
-  Cnf cnf = Cnf(pe_nodes, mem_nodes, coms, dfg.ninputs, dfg.output_ids(), assignments, dfg.operands);
+  Cnf cnf = Cnf(graph.nodes["pe"], graph.nodes["mem"], graph.edges["com"], dfg.ninputs, dfg.output_ids(), assignments, dfg.operands);
   cnf.nencode = nencode;
   if(dfg.fmulti) {
     cnf.fmultiop = 1;
@@ -598,11 +507,11 @@ int main(int argc, char** argv) {
   
   if(nverbose) {
     map<int, string> node_id2name;
-    for(auto elem : node_name2id) {
+    for(auto elem : graph.name2id) {
       node_id2name[elem.second] = elem.first;
     }
-    for(int j = 0; j < coms.size(); j++) {
-      auto com = coms[j];
+    for(int j = 0; j < graph.edges["com"].size(); j++) {
+      auto com = graph.edges["com"][j];
       string name;
       for(int i : get<0>(com)) {
 	name += node_id2name[i] + " ";
@@ -612,7 +521,7 @@ int main(int argc, char** argv) {
 	name += node_id2name[i] + " ";
       }
       name.pop_back();
-      node_id2name[nnodes+j] = name;
+      node_id2name[graph.nnodes+j] = name;
     }
     cout << "### results ###" << endl;
     for(int k = 0; k < cnf.image.size(); k++) {
