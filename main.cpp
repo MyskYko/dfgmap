@@ -11,7 +11,7 @@
 using namespace std;
 
 int main(int argc, char** argv) {
-  bool fout = 1;
+  bool fout = 0;
   
   string efilename = "e.txt";
   string ffilename = "f.txt";
@@ -21,9 +21,8 @@ int main(int argc, char** argv) {
   string pfilename_ilp = "_test.lp";
   string rfilename_ilp = "_test.sol";
   string dfilename = "_test.dot";
-  struct {
-    string operator()(int i) { return "_image" + to_string(i) + ".png"; }
-  } ifilename;
+  string ifilename_base = "_image";
+  string ifilename_type = "png";
 
   vector<string> solver_cmds = {"minisat " + pfilename + " " + rfilename,
 				"glucose " + pfilename + " " + rfilename,
@@ -32,7 +31,7 @@ int main(int argc, char** argv) {
 
   string solver_cmd_ilp = "cplex -c \"read " + pfilename_ilp + "\" \"set emphasis mip 1\" \"set threads 1\" \"optimize\" \"write " +  rfilename_ilp + "\"";
 
-  string dot_cmd = "dot -Tpng " + dfilename;
+  string dot_cmd = "dot -T" + ifilename_type + " " + dfilename;
 
   int ncycles = 0;
   int nregs = 2;
@@ -381,6 +380,7 @@ int main(int argc, char** argv) {
 
   // solve
   while(1) {
+    cout << "### synthesis ###" << endl;
     cout << "ncycles : " << ncycles << endl;
     cout << "ndata : " << dfg.get_ndata() << endl;
     cnf.gen_cnf(ncycles, nregs, nprocs, fextmem, ncontexts, pfilename);
@@ -463,7 +463,7 @@ int main(int argc, char** argv) {
   }
 
   if(finc) {
-    cout << endl << "time : " << totaltime << "ms" << endl;
+    cout << endl << "time : " << totaltime << "ms in total" << endl;
   }
 
   cnf.gen_image(rfilename);
@@ -494,7 +494,7 @@ int main(int argc, char** argv) {
       for(int j = 0; j < cnf.image[0].size(); j++) {
 	cout << "\t" << node_id2name[j] << " :";
 	for(int i : cnf.image[k][j]) {
-	  cout << " " << i << "#" << dfg.get_dataname(i);
+	  cout << " #" << i << "=" << dfg.get_dataname(i) << ", ";
 	}
 	cout << endl;
       }
@@ -503,6 +503,12 @@ int main(int argc, char** argv) {
 
   // dot file
   if(fout) {
+    for(int i = 0; 1; i++) {
+      string name = ifilename_base + to_string(i) + "." + ifilename_type;
+      if(remove(name.c_str())) {
+	break;
+      }
+    }
     map<int, string> node_id2name = graph.get_id2name();
     auto pes = graph.get_nodes("pe");
     auto mems = graph.get_nodes("mem");
@@ -583,7 +589,7 @@ int main(int argc, char** argv) {
       f << "}" << endl;
       f.close();
       string cmd = dot_cmd;
-      cmd += " -o " + ifilename(k);
+      cmd += " -o " + ifilename_base + to_string(k) + "." + ifilename_type;
       system(cmd.c_str());
     }
   }
