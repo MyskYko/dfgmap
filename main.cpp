@@ -1,6 +1,7 @@
 #include <fstream>
 #include <sstream>
 #include <cstdio>
+#include <chrono>
 
 #include "global.hpp"
 #include "graph.hpp"
@@ -376,6 +377,7 @@ int main(int argc, char** argv) {
     rfilename = rfilename_ilp;
     solver_cmd = solver_cmd_ilp;
   }
+  double totaltime = 0;
 
   // solve
   while(1) {
@@ -391,7 +393,9 @@ int main(int argc, char** argv) {
       cmd += " > /dev/null 2>&1";
     }
     remove(rfilename.c_str());
+    auto starttime = chrono::system_clock::now();
     int r = system(cmd.c_str());
+    auto endtime = chrono::system_clock::now();
     r = r >> 8;
     if(r == 124) {
       cout << "Timeout" << endl;
@@ -400,61 +404,66 @@ int main(int argc, char** argv) {
     if(r > 124) {
       show_error("solver command", cmd);
     }
+    double dtime = chrono::duration_cast<std::chrono::milliseconds>(endtime-starttime).count();
+    totaltime += dtime;
     ifstream f(rfilename);
     if(filp) {
+      r = !f.fail();
+    }
+    else {
       if(!f) {
-	std::cout << "No solution" << std::endl;
-	if(!finc) {
-	  return 0;
-	}
-	ncycles++;
-	continue;
+	show_error("cannot open result file", rfilename);
       }
-      else {
-	std::cout << "Solution found" << std::endl;
-	break;
-      }
-    }
-    if(!f) {
-      show_error("cannot open result file", rfilename);
-    }
-    r = 0;
-    string l;
-    while(getline(f, l)) {
-      string s;
-      stringstream ss(l);
-      getline(ss, s, ' ');
-      if(s == "SAT" || s == "1" || s == "-1") {
-	r = 1;
-	break;
-      }
-      else if(s == "UNSAT") {
-	break;
-      }
-      else if(s == "s") {
+      string l;
+      r = -1;
+      while(getline(f, l)) {
+	string s;
+	stringstream ss(l);
 	getline(ss, s, ' ');
-	if(s == "SATISFIABLE") {
+	if(s == "SAT" || s == "1" || s == "-1") {
 	  r = 1;
 	  break;
 	}
-	else if(s == "UNSATISFIABLE") {
+	else if(s == "UNSAT") {
+	  r = 0;
 	  break;
 	}
+	else if(s == "s") {
+	  getline(ss, s, ' ');
+	  if(s == "SATISFIABLE") {
+	    r = 1;
+	    break;
+	  }
+	  else if(s == "UNSATISFIABLE") {
+	    r = 0;
+	    break;
+	  }
+	}
+      }
+      if(r == -1) {
+	show_error("malformed result", rfilename);
       }
     }
     f.close();
+    
     // show results
     if(r) {
       std::cout << "Solution found" << std::endl;
+      cout << "time : " << dtime << "ms" << endl;
       break;
     }
     else {
       std::cout << "No solution" << std::endl;
+      cout << "time : " << dtime << "ms" << endl;
     }
     if(!finc) {
       return 0;
     }
     ncycles++;
+  }
+
+  if(finc) {
+    cout << endl << "time : " << totaltime << "ms" << endl;
   }
 
   cnf.gen_image(rfilename);
@@ -493,7 +502,7 @@ int main(int argc, char** argv) {
   }
 
   // dot file
-  {
+  if(fout) {
     map<int, string> node_id2name = graph.get_id2name();
     auto pes = graph.get_nodes("pe");
     auto mems = graph.get_nodes("mem");
@@ -578,6 +587,6 @@ int main(int argc, char** argv) {
       system(cmd.c_str());
     }
   }
-  
+
   return 0;
 }
