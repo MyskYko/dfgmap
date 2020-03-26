@@ -10,11 +10,15 @@
 using namespace std;
 
 int main(int argc, char** argv) {
+  bool fout = 1;
+  
   string efilename = "e.txt";
   string ffilename = "f.txt";
   string gfilename = "g.txt";
   string pfilename = "_test.cnf";
   string rfilename = "_test.out";
+  string pfilename_ilp = "_test.lp";
+  string rfilename_ilp = "_test.sol";
   string dfilename = "_test.dot";
   struct {
     string operator()(int i) { return "_image" + to_string(i) + ".png"; }
@@ -25,34 +29,43 @@ int main(int argc, char** argv) {
 				"lingeling " + pfilename + " | tee " + rfilename,
 				"plingeling " + pfilename + " | tee " + rfilename};
 
-  string pfilename_ilp = "_test.lp";
-  string rfilename_ilp = "_test.sol";
   string solver_cmd_ilp = "cplex -c \"read " + pfilename_ilp + "\" \"set emphasis mip 1\" \"set threads 1\" \"optimize\" \"write " +  rfilename_ilp + "\"";
 
   string dot_cmd = "dot -Tpng " + dfilename;
-  
+
   int ncycles = 0;
   int nregs = 2;
   int nprocs = 1;
+  int ncontexts = 0;
   
   bool fextmem = 0;
-  bool freduce = 1;
   bool ftransform = 0;
-  int ncontexts = 0;
+  bool fmultiopr = 1;
 
+  bool filp = 0;
+  bool freduce = 1;
+  bool finc = 0;
+  string timeout = "1d";
+  
   int nsolver = 0;
   int nencode = 3;
-  bool finc = 0;
-  bool filp = 0;
-
-  string timeout = "1d";
   
   int nverbose = 0;
 
   // read command
   for(int i = 1; i < argc; i++) {
-    if(argv[i][0] == '-') {
-      switch(argv[i][1]) {
+    if(argv[i][0] != '-' || argv[i][1] == '\0') {
+      show_error("invalid option", argv[i]);
+    }
+    int i_ = i;
+    for(int j = 1; argv[i_][j] != '\0'; j++) {
+      if(i != i_) {
+	show_error("invalid option", argv[i_]);
+      }
+      switch(argv[i_][j]) {
+      case 'o':
+	fout ^= 1;
+	break;
       case 'e':
 	if(i+1 >= argc) {
 	  show_error("-e must be followed by file name");
@@ -112,15 +125,6 @@ int main(int argc, char** argv) {
 	  show_error("the number of processors must not be 0");
 	}
 	break;
-      case 'x':
-	fextmem ^= 1;
-	break;
-      case 'y':
-	freduce ^= 1;
-	break;
-      case 'c':
-	ftransform ^= 1;
-	break;
       case 't':
 	try {
 	  ncontexts = str2int(argv[++i]);
@@ -132,11 +136,23 @@ int main(int argc, char** argv) {
 	  show_error("the number of contexts must be more than 0");
 	}
 	break;
-      case 'a':
-	finc ^= 1;
+      case 'x':
+	fextmem ^= 1;
+	break;
+      case 'c':
+	ftransform ^= 1;
+	break;
+      case 'm':
+	fmultiopr ^= 1;
 	break;
       case 'i':
 	filp ^= 1;
+	break;
+      case 'y':
+	freduce ^= 1;
+	break;
+      case 'a':
+	finc ^= 1;
 	break;
       case 'l':
 	try {
@@ -190,19 +206,21 @@ int main(int argc, char** argv) {
       case 'h':
 	cout << "usage : gen <options>" << endl;
 	cout << "\t-h       : show this usage" << endl;
+	cout << "\t-o       : toggle generating output image files [default = " << fout << "]" << endl;
 	cout << "\t-e <str> : the name of environment file [default = \"" << efilename << "\"]" << endl;
 	cout << "\t-f <str> : the name of formula file [default = \"" << ffilename << "\"]" << endl;
 	cout << "\t-g <str> : the name of option file [default = \"" << gfilename << "\"]" << endl;
 	cout << "\t-n <int> : the number of cycles [default = " << ncycles << "]" << endl;
 	cout << "\t-r <int> : the number of registers in each PE (just -r means no limit) [default = " << nregs << "]" << endl;
 	cout << "\t-u <int> : the number of processors in each PE (just -u means no limit) [default = " << nprocs << "]" << endl;
-	cout << "\t-x       : toggle enabling external memory to store intermediate values [default = " << fextmem << "]" << endl;
-	cout << "\t-y       : toggle enabling post processing to remove redundancy [default = " << freduce << "]" << endl;
-	cout << "\t-c       : toggle transforming dataflow [default = " << ftransform << "]" << endl;
 	cout << "\t-t <int> : the number of contexts for pipeline (0 means no pipelining) [default = " << ncontexts << "]" << endl;
-	cout << "\t-a       : toggle incremental synthesis [default = " << finc << "]" << endl;
+	cout << "\t-x       : toggle enabling external memory to store intermediate values [default = " << fextmem << "]" << endl;
+	cout << "\t-c       : toggle transforming dataflow [default = " << ftransform << "]" << endl;
+	cout << "\t-m       : toggle using given multi-operator operations [default = " << fmultiopr << "]" << endl;
 	cout << "\t-i       : toggle using ILP solver instead of SAT solver [default = " << filp << "]" << endl;
-	cout << "\t-l <str> : timeout duration (0 means no time limit) [default = " << timeout << "]" << endl;
+	cout << "\t-y       : toggle post processing to remove redundancy [default = " << freduce << "]" << endl;
+	cout << "\t-a       : toggle doing incremental synthesis [default = " << finc << "]" << endl;
+	cout << "\t-l <str> : the duration of timeout for each problem (0 means no time limit) [default = " << timeout << "]" << endl;
 	cout << "\t-d <int> : the type of at most one encoding [default = " << nencode << "]" << endl;
 	cout << "\t           \t0 : naive" << endl;
 	cout << "\t           \t1 : commander" << endl;
@@ -253,7 +271,7 @@ int main(int argc, char** argv) {
   }
 
   // generate operand list
-  dfg.gen_operands();
+  dfg.gen_operands(fmultiopr);
   if(nverbose >= 2) {
     cout << "### operand list ###" << endl;
     dfg.print_operands();

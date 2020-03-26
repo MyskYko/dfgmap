@@ -344,7 +344,7 @@ void Dfg::gen_operands_node(node *p) {
   p->id = unique[key];
 }
 
-void Dfg::gen_operands() {
+void Dfg::gen_operands(bool fmultiopr) {
   ndata = ninputs;
   oprtypes.clear();
   oprtypes.resize(ndata);
@@ -361,7 +361,9 @@ void Dfg::gen_operands() {
   fmulti = 0;
   operands.clear();
   operands.resize(ndata);
-  support_multiopr();
+  if(fmultiopr) {
+    support_multiopr();
+  }
   for(int i = 0; i < ndata; i++) {
     for(auto &v : operands_[i]) {
       set<int> s(v.begin(), v.end());

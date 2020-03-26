@@ -16,7 +16,7 @@ public:
   
   void read(std::string filename);
   void compress();
-  void gen_operands();
+  void gen_operands(bool fmultiopr);
   
   int input_id(std::string name);
   std::set<int> output_ids();
