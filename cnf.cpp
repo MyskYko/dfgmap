@@ -22,8 +22,9 @@ Cnf::Cnf(set<int> pes, set<int> mems, vector<tuple<set<int>, set<int>, int> > co
       incoms[recipient].insert(i);
     }
   }
+  assignments[0].resize(ndata);
   for(int i = 0; i < ninputs; i++) {
-    assignments[0].insert(i);
+    assignments[0][i] = 1;
   }
 }
 
@@ -285,7 +286,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
   for(int j = 0; j < nnodes; j++) {
     for(int i = 0; i < ndata; i++) {
       vLits.clear();
-      if(assignments.count(j) && assignments[j].count(i)) {
+      if(assignments.count(j) && assignments[j][i]) {
 	vLits.push_back(j*ndata + i + 1);
       }
       else {

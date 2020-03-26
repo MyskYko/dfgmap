@@ -339,11 +339,11 @@ int main(int argc, char** argv) {
 	    if(graph.get_type(id) != "mem") {
 	      show_error("non-Mem node", vs[0]);
 	    }
-	    set<int> sinputs;
+	    cnf.assignments[id].clear();
+	    cnf.assignments[id].resize(dfg.get_ndata());
 	    for(int i = 1; i < vs.size(); i++) {
-	      sinputs.insert(dfg.input_id(vs[i]));
+	      cnf.assignments[id][dfg.input_id(vs[i])] = 1;
 	    }
-	    cnf.assignments[id] = sinputs;
 	  }
 	}
       }

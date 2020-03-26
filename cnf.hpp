@@ -12,7 +12,7 @@ public:
   int nencode = 0;
   bool fmulti = 0;
   bool filp = 0;
-  std::map<int, std::set<int> > assignments;
+  std::map<int, std::vector<bool> > assignments;
   std::vector<std::vector<std::vector<int> > > image;
 
   Cnf(std::set<int> pes, std::set<int> mem_nodes, std::vector<std::tuple<std::set<int>, std::set<int>, int> > coms, int ninputs, std::set<int> output_ids, std::vector<std::set<std::set<int> > > operands);

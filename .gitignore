@@ -4,4 +4,5 @@ test*
 _*
 cplex.log
 .nfs*
-out*
+benchmark/*
+!benchmark/*.cpp
