@@ -20,8 +20,10 @@ static inline void show_error(std::string s, std::string s2) {
 }
 
 static inline int str2int(std::string s) {
-  if(!std::all_of(s.cbegin(), s.cend(), isdigit)) {
-    throw "non-number included";
+  for(int i = 0; i < (int)s.size(); i++) {
+    if((s[i] < '0' || s[i] >'9') && (i != 0 || s[i] != '-')) {
+      throw 0;
+    }
   }
   return std::stoi(s);
 }

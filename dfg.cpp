@@ -513,10 +513,13 @@ void Dfg::read(string filename) {
 	}
 	int n;
 	try {
-	  n = stoi(vs[1]);
+	  n = str2int(vs[1]);
 	}
 	catch(...) {
 	  show_error("non-integer noperands", vs[1]);
+	}
+	if(n <= 0) {
+	  show_error("negative noperands", vs[1]);
 	}
 	bool fc = 0;
 	bool fa = 0;

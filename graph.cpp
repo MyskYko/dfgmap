@@ -90,13 +90,13 @@ void Graph::read(string filename) {
 	  show_error("incomplete line", l);
 	}
 	try {
-	  band = stoi(vs[i]);
+	  band = str2int(vs[i]);
 	}
 	catch(...) {
 	  show_error("non-integer bandwidth", vs[i]);
 	}
 	if(band <= 0) {
-	  show_error("negative bandwidth", vs[i]);
+	  show_error("bandwidth must be more than 0", vs[i]);
 	}
       }
       auto e = make_tuple(senders, recipients, band);

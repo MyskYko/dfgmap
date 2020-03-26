@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
 	  show_error("-r should be followed by integer");
 	}
 	if(nregs == 0) {
-	  show_error("the number of registers must not be 0");
+	  show_error("the number of registers must be more than 0");
 	}
 	break;
       case 'p':
@@ -122,7 +122,7 @@ int main(int argc, char** argv) {
 	  show_error("-p should be followed by integer");
 	}
 	if(nprocs == 0) {
-	  show_error("the number of processors must not be 0");
+	  show_error("the number of processors must be more than 0");
 	}
 	break;
       case 't':
@@ -158,11 +158,15 @@ int main(int argc, char** argv) {
 	try {
 	  timeout = argv[++i];
 	  char c = timeout.back();
+	  int n;
 	  if(c == 's' || c == 'm' || c == 'h' || c == 'd') {
-	    str2int(timeout.substr(0, timeout.size()-1));
+	    n = str2int(timeout.substr(0, timeout.size()-1));
 	  }
 	  else {
-	    str2int(timeout);
+	    n = str2int(timeout);
+	  }
+	  if(n < 0) {
+	    throw 0;
 	  }
 	}
 	catch(...) {
@@ -188,7 +192,7 @@ int main(int argc, char** argv) {
 	  show_error("-s must be followed by integer");
 	}
 	if(nsolver < 0 || nsolver >= (int)solver_cmds.size()) {
-	  show_error("SAT solver must be more than 0 and less than", to_string(solver_cmds.size()));
+	  show_error("SAT solver must be between 0 and ", to_string(solver_cmds.size()));
 	}
 	break;
       case 'v':
@@ -343,6 +347,42 @@ int main(int argc, char** argv) {
 	    cnf.assignments[id].resize(dfg.get_ndata());
 	    for(int i = 1; i < (int)vs.size(); i++) {
 	      cnf.assignments[id][dfg.input_id(vs[i])] = 1;
+	    }
+	  }
+	}
+	if(vs[0] == ".memsize") {
+	  while(getline(f, l)) {
+	    vs.clear();
+	    ss.str(l);
+	    ss.clear();
+	    while(getline(ss, s, ' ')) {
+	      vs.push_back(s);
+	    }
+	    if(vs.empty()) {
+	      continue;
+	    }
+	    if(vs[0][0] == '.') {
+	      r = 0;
+	      break;
+	    }
+	    if(vs.size() != 2) {
+	      show_error("incomplete line", l);
+	    }
+	    int id = graph.get_id(vs[0]);
+	    if(id == -1) {
+	      show_error("unspecified node", vs[0]);
+	    }
+	    if(graph.get_type(id) != "mem") {
+	      show_error("non-Mem node", vs[0]);
+	    }
+	    try {
+	      cnf.memsize[id] = str2int(vs[1]);
+	    }
+	    catch(...) {
+	      show_error("non-integer size", vs[1]);
+	    }
+	    if(cnf.memsize[id] <= 0) {
+	      show_error("memsize must be more than 0", vs[1]);
 	    }
 	  }
 	}

@@ -443,6 +443,21 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	cardinality_amk(nvars, nclauses, vLits, f, nprocs);
       }
     }
+    // memsize
+    for(auto j : memsize) {
+      vLits.clear();
+      for(int k = t+1; k < ncycles; k += ncontexts) {
+	for(int i = 0; i < ndata; i++) {
+	  vLits.push_back(k*nnodes*ndata + j.first*ndata + i + 1);
+	}
+      }
+      if(j.second == 1) {
+	cardinality_amo(nvars, nclauses, vLits, f);
+      }
+      else if (j.second > 0) {
+	cardinality_amk(nvars, nclauses, vLits, f, j.second);
+      }
+    }
   }
 
   // option
@@ -538,8 +553,8 @@ void Cnf::gen_image(string filename) {
 		svalue = s.substr(1, s.size()-2);
 	      }
 	    }
-	    if(stoi(svalue)) {
-	      results[stoi(sname)-1] = 1;
+	    if(str2int(svalue)) {
+	      results[str2int(sname)-1] = 1;
 	    }
 	  }
 	  catch(...) {
@@ -558,7 +573,7 @@ void Cnf::gen_image(string filename) {
       }
       while(getline(ss, s, ' ')) {
 	try {
-	  int i = stoi(s);
+	  int i = str2int(s);
 	  if(i > 0) {
 	    results[i-1] = 1;
 	  }
@@ -571,7 +586,7 @@ void Cnf::gen_image(string filename) {
     else if(s == "v") {
       while(getline(ss, s, ' ')) {
 	try {
-	  int i = stoi(s);
+	  int i = str2int(s);
 	  if(i > 0) {
 	    results[i-1] = 1;
 	  }
