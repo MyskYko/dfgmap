@@ -44,7 +44,7 @@ void Graph::read(string filename) {
     }
     string type = vs[0].substr(1);
     if(vs.size() != 1) {
-      for(int i = 1; i < vs.size(); i++) {
+      for(int i = 1; i < (int)vs.size(); i++) {
 	create_node(type, vs[i]);
       }
       continue;
@@ -66,27 +66,27 @@ void Graph::read(string filename) {
       }
       int i = 0;
       set<int> senders;
-      for(; i < vs.size() && vs[i] != "->"; i++) {
+      for(; i < (int)vs.size() && vs[i] != "->"; i++) {
 	if(!name2id.count(vs[i])) {
 	  show_error("unspecified node", vs[i]);
 	}
 	senders.insert(name2id[vs[i]]);	
       }
-      if(i == vs.size()) {
+      if(i == (int)vs.size()) {
 	show_error("incomplete line", l);
       }
       i++;
       set<int> recipients;
-      for(; i < vs.size() && vs[i] != ":"; i++) {
+      for(; i < (int)vs.size() && vs[i] != ":"; i++) {
 	if(!name2id.count(vs[i])) {
 	  show_error("unspecified node", vs[i]);
 	}
 	recipients.insert(name2id[vs[i]]);
       }
       int band = -1;
-      if(i < vs.size() && vs[i] == ":") {
+      if(i < (int)vs.size() && vs[i] == ":") {
 	i++;
-	if(i == vs.size()) {
+	if(i == (int)vs.size()) {
 	  show_error("incomplete line", l);
 	}
 	try {

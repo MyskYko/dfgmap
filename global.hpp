@@ -7,19 +7,19 @@
 #include <algorithm>
 #include <cctype>
 
-static void show_error(std::string s) {
+static inline void show_error(std::string s) {
   std::cout << "error : " << s << std::endl;
   std::cout << "see usage by using option -h" << std::endl;
   abort();
 }
 
-static void show_error(std::string s, std::string s2) {
+static inline void show_error(std::string s, std::string s2) {
   std::cout << "error : " << s << " \"" << s2 << "\"" << std::endl;
   std::cout << "see usage by using option -h" << std::endl;
   abort();
 }
 
-static int str2int(std::string s) {
+static inline int str2int(std::string s) {
   if(!std::all_of(s.cbegin(), s.cend(), isdigit)) {
     throw "non-number included";
   }
@@ -40,12 +40,12 @@ static void recursive_comb(int *indices, int s, int rest, std::function<void(int
   }
 }
 
-static void foreach_comb(int n, int k, std::function<void(int *)> f) {
+static inline void foreach_comb(int n, int k, std::function<void(int *)> f) {
   int indices[k];
   recursive_comb(indices, n - 1, k, f);
 }
 
-static void foreach_perm(int n, std::function<void(int *)> f) {
+static inline void foreach_perm(int n, std::function<void(int *)> f) {
   int indices[n];
   for(int i = 0; i < n; i++) {
     indices[i] = i;
@@ -55,7 +55,7 @@ static void foreach_perm(int n, std::function<void(int *)> f) {
   } while (std::next_permutation(indices, indices + n));
 }
 
-static int integer_log2(int n) { // wrap up
+static inline int integer_log2(int n) { // wrap up
   int t = 1;
   int count = 0;
   while(n > t) {
@@ -65,7 +65,7 @@ static int integer_log2(int n) { // wrap up
   return count;
 }
 
-static int integer_root(int n) { // wrap down
+static inline int integer_root(int n) { // wrap down
   if(n == 1) {
     return 1;
   }

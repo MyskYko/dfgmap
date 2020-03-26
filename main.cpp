@@ -187,7 +187,7 @@ int main(int argc, char** argv) {
 	catch(...) {
 	  show_error("-s must be followed by integer");
 	}
-	if(nsolver < 0 || nsolver >= solver_cmds.size()) {
+	if(nsolver < 0 || nsolver >= (int)solver_cmds.size()) {
 	  show_error("SAT solver must be more than 0 and less than", to_string(solver_cmds.size()));
 	}
 	break;
@@ -341,7 +341,7 @@ int main(int argc, char** argv) {
 	    }
 	    cnf.assignments[id].clear();
 	    cnf.assignments[id].resize(dfg.get_ndata());
-	    for(int i = 1; i < vs.size(); i++) {
+	    for(int i = 1; i < (int)vs.size(); i++) {
 	      cnf.assignments[id][dfg.input_id(vs[i])] = 1;
 	    }
 	  }
@@ -475,7 +475,7 @@ int main(int argc, char** argv) {
   if(nverbose) {
     map<int, string> node_id2name = graph.get_id2name();
     auto coms = graph.get_edges("com");
-    for(int j = 0; j < coms.size(); j++) {
+    for(int j = 0; j < (int)coms.size(); j++) {
       auto com = coms[j];
       string name;
       for(int i : get<0>(com)) {
@@ -489,9 +489,9 @@ int main(int argc, char** argv) {
       node_id2name[graph.get_nnodes() + j] = name;
     }
     cout << "### results ###" << endl;
-    for(int k = 0; k < cnf.image.size(); k++) {
+    for(int k = 0; k < (int)cnf.image.size(); k++) {
       cout << "cycle " << k << " :" << endl;
-      for(int j = 0; j < cnf.image[0].size(); j++) {
+      for(int j = 0; j < (int)cnf.image[0].size(); j++) {
 	cout << "\t" << node_id2name[j] << " :";
 	for(int i : cnf.image[k][j]) {
 	  cout << " #" << i << "=" << dfg.get_dataname(i) << ", ";
@@ -513,7 +513,7 @@ int main(int argc, char** argv) {
     auto pes = graph.get_nodes("pe");
     auto mems = graph.get_nodes("mem");
     auto coms = graph.get_edges("com");
-    for(int k = 0; k < cnf.image.size(); k++) {
+    for(int k = 0; k < (int)cnf.image.size(); k++) {
       ofstream f(dfilename);
       if(!f) {
 	show_error("cannot open file", dfilename);
@@ -544,7 +544,7 @@ int main(int argc, char** argv) {
 	}
 	f << "\" ];" << endl;
       }
-      for(int h = 0; h < coms.size(); h++) {
+      for(int h = 0; h < (int)coms.size(); h++) {
 	auto &com = coms[h];
 	if(get<0>(com).size() > 1 || get<1>(com).size() > 1) {
 	  if(cnf.image[k][graph.get_nnodes()+h].empty()) {

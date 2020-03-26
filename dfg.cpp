@@ -23,7 +23,7 @@ void Dfg::create_opr(string s, int n, bool fc, bool fa) {
 }
 
 int Dfg::oprtype(string s) {
-  for(int i = 0; i < oprs.size(); i++) {
+  for(int i = 0; i < (int)oprs.size(); i++) {
     if(oprs[i]->s == s) {
       return i;
     }
@@ -32,21 +32,21 @@ int Dfg::oprtype(string s) {
 }
 
 string Dfg::typeopr(int i) {
-  if(i < 0 || i >= oprs.size()) {
+  if(i < 0 || i >= (int)oprs.size()) {
     show_error("no oprtype", to_string(i) );
   }
   return oprs[i]->s;
 }
 
 bool Dfg::fcommutative(int i) {
-  if(i < 0 || i >= oprs.size()) {
+  if(i < 0 || i >= (int)oprs.size()) {
     show_error("no oprtype", to_string(i) );
   }
   return oprs[i]->attr % 2;
 }
 
 bool Dfg::fassociative(int i) {
-  if(i < 0 || i >= oprs.size()) {
+  if(i < 0 || i >= (int)oprs.size()) {
     show_error("no oprtype", to_string(i) );
   }
   return oprs[i]->attr >> 1;
@@ -62,7 +62,7 @@ void Dfg::create_input(string name) {
 }
 
 Dfg::node *Dfg::create_multiopr(vector<string> &vs, int &pos) {
-  if(pos >= vs.size()) {
+  if(pos >= (int)vs.size()) {
     ostringstream os;
     copy(vs.begin(), vs.end(), ostream_iterator<string>(os, " "));
     show_error("incomplete line", os.str());
@@ -91,7 +91,7 @@ void Dfg::create_multiopr(vector<string> &vs) {
 }
 
 Dfg::node *Dfg::create_node(vector<string> &vs, int &pos) {
-  if(pos >= vs.size()) {
+  if(pos >= (int)vs.size()) {
     ostringstream os;
     copy(vs.begin(), vs.end(), ostream_iterator<string>(os, " "));
     show_error("incomplete line", os.str());
@@ -164,7 +164,7 @@ void Dfg::compress_node(node *p) {
   }
   if(fassociative(p->type)) {
     vector<node *> vcn;
-    for(int i = 0; i < p->vc.size(); i++) {
+    for(int i = 0; i < (int)p->vc.size(); i++) {
       auto c = p->vc[i];
       if(p->type == c->type) {
 	p->vc.insert(p->vc.begin() + i + 1, c->vc.begin(), c->vc.end());
@@ -227,8 +227,8 @@ void Dfg::gen_operands_node(node *p) {
     return;
   }
   if(!fcommutative(p->type)) {
-    for(int i = 2; i <= cids.size(); i++) {
-      for(int j = 0; j <= cids.size()-i; j++) {
+    for(int i = 2; i <= (int)cids.size(); i++) {
+      for(int j = 0; j <= (int)cids.size()-i; j++) {
 	vector<int> sub;
 	for(int k = j; k < j+i; k++) {
 	  sub.push_back(cids[k]);
@@ -282,7 +282,7 @@ void Dfg::gen_operands_node(node *p) {
     p->id = unique[key];
     return;
   }
-  for(int i = 2; i <= cids.size(); i++) {
+  for(int i = 2; i <= (int)cids.size(); i++) {
     foreach_comb(cids.size(), i, [&](int *indices) {
 				   vector<int> sub;
 				   for(int k = 0; k < i; k++) {
@@ -484,12 +484,12 @@ void Dfg::read(string filename) {
     }
     r = 1;
     if(vs[0] == ".i") {
-      for(int i = 1; i < vs.size(); i++) {
+      for(int i = 1; i < (int)vs.size(); i++) {
 	create_input(vs[i]);
       }
     }
     if(vs[0] == ".o") {
-      for(int i = 1; i < vs.size(); i++) {
+      for(int i = 1; i < (int)vs.size(); i++) {
 	outputnames.push_back(vs[i]);
       }
     }
@@ -520,7 +520,7 @@ void Dfg::read(string filename) {
 	}
 	bool fc = 0;
 	bool fa = 0;
-	for(int i = 2; i < vs.size(); i++) {
+	for(int i = 2; i < (int)vs.size(); i++) {
 	  if(vs[i] == "c") {
 	    fc = 1;
 	  }

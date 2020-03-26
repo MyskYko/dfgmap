@@ -7,7 +7,7 @@
 
 using namespace std;
 
-Cnf::Cnf(set<int> pes, set<int> mems, vector<tuple<set<int>, set<int>, int> > coms, int ninputs, set<int> output_ids, vector<set<set<int> > > operands) :pes(pes), mems(mems), coms(coms), ninputs(ninputs), output_ids(output_ids), operands(operands)
+Cnf::Cnf(set<int> pes, set<int> mems, vector<tuple<set<int>, set<int>, int> > coms, int ninputs, set<int> output_ids, vector<set<set<int> > > operands) :ninputs(ninputs), pes(pes), mems(mems), coms(coms), output_ids(output_ids), operands(operands)
 {
   nnodes = pes.size() + mems.size();
   ndata = operands.size();
@@ -67,7 +67,7 @@ void Cnf::amo_bimander(int &nvars, int &nclauses, vector<int> &vLits, ofstream &
   int nb = integer_log2(m);
   for(int i = 0; i < m; i++) {
     vLits2.clear();
-    for(int j = 0; j < nbim && i*nbim + j < vLits.size(); j++) {
+    for(int j = 0; j < nbim && i*nbim + j < (int)vLits.size(); j++) {
       vLits2.push_back(vLits[i*nbim + j]);
     }
     if(vLits2.size() > 1) {
@@ -76,7 +76,7 @@ void Cnf::amo_bimander(int &nvars, int &nclauses, vector<int> &vLits, ofstream &
     for(int k = 0; k < nb; k++) {
       int b = 1 << k;
       if(i & b) {
-	for(int j = 0; j < nbim && i*nbim + j < vLits.size(); j++) {
+	for(int j = 0; j < nbim && i*nbim + j < (int)vLits.size(); j++) {
 	  vLits2.clear();
 	  vLits2.push_back(-vLits[i*nbim + j]);
 	  vLits2.push_back(nvars + k + 1);
@@ -84,7 +84,7 @@ void Cnf::amo_bimander(int &nvars, int &nclauses, vector<int> &vLits, ofstream &
 	}
       }
       else {
-	for(int j = 0; j < nbim && i*nbim + j < vLits.size(); j++) {
+	for(int j = 0; j < nbim && i*nbim + j < (int)vLits.size(); j++) {
 	  vLits2.clear();
 	  vLits2.push_back(-vLits[i*nbim + j]);
 	  vLits2.push_back(-(nvars + k + 1));
@@ -100,7 +100,7 @@ void Cnf::amo_commander(int &nvars, int &nclauses, vector<int> vLits, ofstream &
   vector<int> vLits2;
   while(vLits.size() > 1) {
     int k = 0;
-    for(int j = 0; j < vLits.size()/2; j++) {
+    for(int j = 0; j < (int)vLits.size()/2; j++) {
       nvars++;
       vLits2.clear();
       vLits2.push_back(-vLits[2*j]);
@@ -167,7 +167,7 @@ void Cnf::cardinality_amo(int &nvars, int &nclauses, vector<int> &vLits, ofstrea
 }
 
 void Cnf::cardinality_amk(int &nvars, int &nclauses, vector<int> &vLits, ofstream &f, int k) {
-  if(vLits.size() <= k) {
+  if((int)vLits.size() <= k) {
     return;
   }
   if(filp) {
@@ -195,14 +195,14 @@ void Cnf::cardinality_amk(int &nvars, int &nclauses, vector<int> &vLits, ofstrea
     vCounts.push_back(nvars);
   }
   // subsequent levels
-  for(int j = 1; j < vLits.size(); j++) {
+  for(int j = 1; j < (int)vLits.size(); j++) {
     int x = vLits[j];
     // prohibit overflow (sum>k)
     vLits2.clear();
     vLits2.push_back(-vCounts[k-1]);
     vLits2.push_back(-x);
     write_clause(nclauses, vLits2, f);
-    if(j == vLits.size()-1) {
+    if(j == (int)vLits.size()-1) {
       break;
     }
     for(int i = k-1; i > 0; i--) {
@@ -614,7 +614,7 @@ void Cnf::reduce_image() {
   // mark output data
   for(int id : output_ids) {
     bool f = 0;
-    for(int i = 0; i < image[ncycles_-1][0].size(); i++) {
+    for(int i = 0; i < (int)image[ncycles_-1][0].size(); i++) {
       if(id == image[ncycles_-1][0][i]) {
 	fimage[ncycles_-1][0][i] = 1;
 	f = 1;
@@ -629,14 +629,14 @@ void Cnf::reduce_image() {
   for(int k = ncycles_-1; k > 0; k--) {
     // propagate from mems
     for(int j : mems) {
-      for(int i = 0; i < image[k][j].size(); i++) {
+      for(int i = 0; i < (int)image[k][j].size(); i++) {
 	if(!fimage[k][j][i]) {
 	  continue;
 	}
 	int idi = image[k][j][i];
 	bool f = 0;
 	// mark data in mem at previous cycle if possible
-	for(int ii = 0; ii < image[k-1][j].size(); ii++) {
+	for(int ii = 0; ii < (int)image[k-1][j].size(); ii++) {
 	  int idii = image[k-1][j][ii];
 	  if(idi == idii) {
 	    fimage[k-1][j][ii] = 1;
@@ -649,7 +649,7 @@ void Cnf::reduce_image() {
 	}
 	// mark data coming
 	for(int h : incoms[j]) {
-	  for(int ii = 0; ii < image[k][nnodes+h].size(); ii++) {
+	  for(int ii = 0; ii < (int)image[k][nnodes+h].size(); ii++) {
 	    int idii = image[k][nnodes+h][ii];
 	    if(idi == idii) {
 	      fimage[k][nnodes+h][ii] = 1;
@@ -668,14 +668,14 @@ void Cnf::reduce_image() {
     }
     // propagate from pes
     for(int j : pes) {
-      for(int i = 0; i < image[k][j].size(); i++) {
+      for(int i = 0; i < (int)image[k][j].size(); i++) {
 	if(!fimage[k][j][i]) {
 	  continue;
 	}
 	int idi = image[k][j][i];
 	bool f = 0;
 	// mark data in the pe at previous cycle if possible
-	for(int ii = 0; ii < image[k-1][j].size(); ii++) {
+	for(int ii = 0; ii < (int)image[k-1][j].size(); ii++) {
 	  int idii = image[k-1][j][ii];
 	  if(idi == idii) {
 	    fimage[k-1][j][ii] = 1;
@@ -688,7 +688,7 @@ void Cnf::reduce_image() {
 	}
 	// mark data coming if possible
 	for(int h : incoms[j]) {
-	  for(int ii = 0; ii < image[k][nnodes+h].size(); ii++) {
+	  for(int ii = 0; ii < (int)image[k][nnodes+h].size(); ii++) {
 	    int idii = image[k][nnodes+h][ii];
 	    if(idi == idii) {
 	      fimage[k][nnodes+h][ii] = 1;
@@ -710,7 +710,7 @@ void Cnf::reduce_image() {
 	  for(auto d : s) {
 	    ff = 0;
 	    // in the node
-	    for(int ii = 0; ii < image[k-1][j].size(); ii++) {
+	    for(int ii = 0; ii < (int)image[k-1][j].size(); ii++) {
 	      int idii = image[k-1][j][ii];
 	      if(d == idii) {
 		ff = 1;
@@ -722,7 +722,7 @@ void Cnf::reduce_image() {
 	    }
 	    // coming
 	    for(int h : incoms[j]) {
-	      for(int ii = 0; ii < image[k][nnodes+h].size(); ii++) {
+	      for(int ii = 0; ii < (int)image[k][nnodes+h].size(); ii++) {
 		int idii = image[k][nnodes+h][ii];
 		if(d == idii) {
 		  ff = 1;
@@ -745,7 +745,7 @@ void Cnf::reduce_image() {
 	  for(auto d : s) {
 	    ff = 0;
 	    // in the node
-	    for(int ii = 0; ii < image[k-1][j].size(); ii++) {
+	    for(int ii = 0; ii < (int)image[k-1][j].size(); ii++) {
 	      int idii = image[k-1][j][ii];
 	      if(d == idii) {
 		fimage[k-1][j][ii] = 1;
@@ -758,7 +758,7 @@ void Cnf::reduce_image() {
 	    }
 	    // coming
 	    for(int h : incoms[j]) {
-	      for(int ii = 0; ii < image[k][nnodes+h].size(); ii++) {
+	      for(int ii = 0; ii < (int)image[k][nnodes+h].size(); ii++) {
 		int idii = image[k][nnodes+h][ii];
 		if(d == idii) {
 		  fimage[k][nnodes+h][ii] = 1;
@@ -785,7 +785,7 @@ void Cnf::reduce_image() {
     }
     // propagate from communication paths
     for(int h = 0; h < ncoms; h++) {
-      for(int i = 0; i < image[k][nnodes+h].size(); i++) {
+      for(int i = 0; i < (int)image[k][nnodes+h].size(); i++) {
 	if(!fimage[k][nnodes+h][i]) {
 	  continue;
 	}
@@ -793,7 +793,7 @@ void Cnf::reduce_image() {
 	bool f = 0;
 	for(int j : get<0>(coms[h])) {
 	  // TODO : care ports
-	  for(int ii = 0; ii < image[k-1][j].size(); ii++) {
+	  for(int ii = 0; ii < (int)image[k-1][j].size(); ii++) {
 	    int idii = image[k-1][j][ii];
 	    if(idi == idii) {
 	      fimage[k-1][j][ii] = 1;
@@ -813,7 +813,7 @@ void Cnf::reduce_image() {
   for(int k = 0; k < ncycles_; k++) {
     for(int j = 0; j < nnodes + ncoms; j++) {
       image[k][j].clear();
-      for(int i = 0; i < image_old[k][j].size(); i++) {
+      for(int i = 0; i < (int)image_old[k][j].size(); i++) {
 	if(fimage[k][j][i]) {
 	  image[k][j].push_back(image_old[k][j][i]);
 	}
