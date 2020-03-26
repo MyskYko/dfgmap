@@ -21,7 +21,7 @@ public:
 
   void gen_image(std::string filename);
 
-  //  void reduce_image();
+  void reduce_image();
 
 private:
   int nnodes;

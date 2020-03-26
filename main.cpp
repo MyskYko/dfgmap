@@ -31,6 +31,7 @@ int main(int argc, char** argv) {
   int nprocs = 1;
   
   bool fextmem = 0;
+  bool freduce = 1;
   bool ftransform = 0;
   int ncontexts = 0;
 
@@ -109,6 +110,9 @@ int main(int argc, char** argv) {
       case 'x':
 	fextmem ^= 1;
 	break;
+      case 'y':
+	freduce ^= 1;
+	break;
       case 'c':
 	ftransform ^= 1;
 	break;
@@ -125,6 +129,24 @@ int main(int argc, char** argv) {
 	break;
       case 'a':
 	finc ^= 1;
+	break;
+      case 'i':
+	filp ^= 1;
+	break;
+      case 'l':
+	try {
+	  timeout = argv[++i];
+	  char c = timeout.back();
+	  if(c == 's' || c == 'm' || c == 'h' || c == 'd') {
+	    str2int(timeout.substr(0, timeout.size()-1));
+	  }
+	  else {
+	    str2int(timeout);
+	  }
+	}
+	catch(...) {
+	  show_error("-l must be followed by timeout duration");
+	}
 	break;
       case 'd':
 	try {
@@ -146,24 +168,6 @@ int main(int argc, char** argv) {
 	}
 	if(nsolver < 0 || nsolver >= solver_cmds.size()) {
 	  show_error("SAT solver must be more than 0 and less than", to_string(solver_cmds.size()));
-	}
-	break;
-      case 'i':
-	filp ^= 1;
-	break;
-      case 'l':
-	try {
-	  timeout = argv[++i];
-	  char c = timeout.back();
-	  if(c == 's' || c == 'm' || c == 'h' || c == 'd') {
-	    str2int(timeout.substr(0, timeout.size()-1));
-	  }
-	  else {
-	    str2int(timeout);
-	  }
-	}
-	catch(...) {
-	  show_error("-l must be followed by timeout duration");
 	}
 	break;
       case 'v':
@@ -188,9 +192,12 @@ int main(int argc, char** argv) {
 	cout << "\t-r <int> : the number of registers in each PE (just -r means no limit) [default = " << nregs << "]" << endl;
 	cout << "\t-u <int> : the number of processors in each PE (just -u means no limit) [default = " << nprocs << "]" << endl;
 	cout << "\t-x       : toggle enabling external memory to store intermediate values [default = " << fextmem << "]" << endl;
+	cout << "\t-y       : toggle enabling post processing to remove redundancy [default = " << freduce << "]" << endl;
 	cout << "\t-c       : toggle transforming dataflow [default = " << ftransform << "]" << endl;
 	cout << "\t-t <int> : the number of contexts for pipeline (0 means no pipelining) [default = " << ncontexts << "]" << endl;
 	cout << "\t-a       : toggle incremental synthesis [default = " << finc << "]" << endl;
+	cout << "\t-i       : toggle using ILP solver instead of SAT solver [default = " << filp << "]" << endl;
+	cout << "\t-l <str> : timeout duration (0 means no time limit) [default = " << timeout << "]" << endl;
 	cout << "\t-d <int> : the type of at most one encoding [default = " << nencode << "]" << endl;
 	cout << "\t           \t0 : naive" << endl;
 	cout << "\t           \t1 : commander" << endl;
@@ -202,8 +209,6 @@ int main(int argc, char** argv) {
 	cout << "\t           \t1 : glucose" << endl;
 	cout << "\t           \t2 : lingeling" << endl;
 	cout << "\t           \t3 : plingeling" << endl;
-	cout << "\t-i       : toggle using ILP solver instead of SAT solver [default = " << filp << "]" << endl;
-	cout << "\t-l <str> : timeout duration (0 means no time limit) [default = " << timeout << "]" << endl;
 	cout << "\t-v <int> : the level of verbosing information [default = " << nverbose << "]" << endl;
 	cout << "\t           \t0 : nothing" << endl;
 	cout << "\t           \t1 : results" << endl;
@@ -211,7 +216,7 @@ int main(int argc, char** argv) {
 	cout << "\t           \t3 : settings, solver outputs, and results" << endl;
 	return 0;
       default:
-	show_error("invalid option " + string(argv[i]));
+	show_error("invalid option", argv[i]);
       }
     }
   }
@@ -431,7 +436,9 @@ int main(int argc, char** argv) {
 
   cnf.gen_image(rfilename);
 
-  //  cnf.reduce_image();
+  if(freduce) {
+    cnf.reduce_image();
+  }
   
   if(nverbose) {
     map<int, string> node_id2name = graph.get_id2name();

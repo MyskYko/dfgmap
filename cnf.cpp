@@ -603,7 +603,6 @@ void Cnf::gen_image(string filename) {
   }
 }
 
-/*
 void Cnf::reduce_image() {
   vector<vector<vector<int> > > fimage(ncycles_, vector<vector<int> >(nnodes + ncoms));
   for(int k = 0; k < ncycles_; k++) {
@@ -613,7 +612,7 @@ void Cnf::reduce_image() {
   }
   // mark output data
   for(int id : output_ids) {
-    int f = 0;
+    bool f = 0;
     for(int i = 0; i < image[ncycles_-1][0].size(); i++) {
       if(id == image[ncycles_-1][0][i]) {
 	fimage[ncycles_-1][0][i] = 1;
@@ -622,61 +621,37 @@ void Cnf::reduce_image() {
       }
     }
     if(!f) {
-      show_error("solution is incomplete");
+      show_error("incomplete solution");
     }
   }
   // propagate backwards
   for(int k = ncycles_-1; k > 0; k--) {
-    // back propagate from exmem
-    for(int i = 0; i < image[k][0].size(); i++) {
-      if(!fimage[k][0][i]) {
-	continue;
-      }
-      int idi = image[k][0][i];
-      int f = 0;
-      // mark data in exmem at previous cycle if possible
-      for(int ii = 0; ii < image[k-1][0].size(); ii++) {
-	int idii = image[k-1][0][ii];
-	if(idi == idii) {
-	  fimage[k-1][0][ii] = 1;
-	  f = 1;
-	  break;
-	}
-      }
-      if(f) {
-	continue;
-      }
-      // mark data coming from o-nodes
-      for(int j : o_nodes) {
-	for(int ii = 0; ii < image[k][j].size(); ii++) {
-	  int idii = image[k][j][ii];
-	  if(idi == idii) {
-	    fimage[k][j][ii] = 1;
-	    f = 1;
-	    break;
-	  }
-	}
-	if(f) {
-	  break;
-	}
-      }
-      if(!f) {
-	show_error("solution is incomplete");
-      }
-    }
-    // back propagate from o-nodes to pe-nodes
-    for(int j : o_nodes) {
+    // propagate from mems
+    for(int j : mems) {
       for(int i = 0; i < image[k][j].size(); i++) {
 	if(!fimage[k][j][i]) {
 	  continue;
 	}
 	int idi = image[k][j][i];
-	int f = 0;
-	for(int c : cons[j]) {
-	  for(int ii = 0; ii < image[k-1][c].size(); ii++) {
-	    int idii = image[k-1][c][ii];
+	bool f = 0;
+	// mark data in mem at previous cycle if possible
+	for(int ii = 0; ii < image[k-1][j].size(); ii++) {
+	  int idii = image[k-1][j][ii];
+	  if(idi == idii) {
+	    fimage[k-1][j][ii] = 1;
+	    f = 1;
+	    break;
+	  }
+	}
+	if(f) {
+	  continue;
+	}
+	// mark data coming
+	for(int h : incoms[j]) {
+	  for(int ii = 0; ii < image[k][nnodes+h].size(); ii++) {
+	    int idii = image[k][nnodes+h][ii];
 	    if(idi == idii) {
-	      fimage[k-1][c][ii] = 1;
+	      fimage[k][nnodes+h][ii] = 1;
 	      f = 1;
 	      break;
 	    }
@@ -686,40 +661,18 @@ void Cnf::reduce_image() {
 	  }
 	}
 	if(!f) {
-	  show_error("solution is incomplete");
+	  show_error("incomplete solution");
 	}
       }
     }
-    // back propagate from communication paths
-    for(int h = 0; h < ncoms; h++) {
-      for(int i = 0; i < image[k][nnodes+h].size(); i++) {
-	if(!fimage[k][nnodes+h][i]) {
-	  continue;
-	}
-	int idi = image[k][nnodes+h][i];
-	int f = 0;
-	int j = get<0>(coms[h]);
-	for(int ii = 0; ii < image[k][j].size(); ii++) {
-	  int idii = image[k][j][ii];
-	  if(idi == idii) {
-	    fimage[k][j][ii] = 1;
-	    f = 1;
-	    break;
-	  }
-	}
-	if(!f) {
-	  show_error("solution is incomplete");
-	}
-      }
-    }
-    // back propagate from pe-nodes
-    for(int j : pe_nodes) {
+    // propagate from pes
+    for(int j : pes) {
       for(int i = 0; i < image[k][j].size(); i++) {
 	if(!fimage[k][j][i]) {
 	  continue;
 	}
 	int idi = image[k][j][i];
-	int f = 0;
+	bool f = 0;
 	// mark data in the pe at previous cycle if possible
 	for(int ii = 0; ii < image[k-1][j].size(); ii++) {
 	  int idii = image[k-1][j][ii];
@@ -732,29 +685,12 @@ void Cnf::reduce_image() {
 	if(f) {
 	  continue;
 	}
-	// mark data coming from adjacent nodes if possible
-	for(int c : cons[j]) {
-	  for(int ii = 0; ii < image[k-1][c].size(); ii++) {
-	    int idii = image[k-1][c][ii];
+	// mark data coming if possible
+	for(int h : incoms[j]) {
+	  for(int ii = 0; ii < image[k][nnodes+h].size(); ii++) {
+	    int idii = image[k][nnodes+h][ii];
 	    if(idi == idii) {
-	      fimage[k-1][c][ii] = 1;
-	      f = 1;
-	      break;
-	    }
-	  }
-	  if(f) {
-	    break;
-	  }
-	}
-	if(f) {
-	  continue;
-	}
-	// mark data coming from communication paths
-	for(int h : concoms[j]) {
-	  for(int ii = 0; ii < image[k-1][nnodes+h].size(); ii++) {
-	    int idii = image[k-1][nnodes+h][ii];
-	    if(idi == idii) {
-	      fimage[k-1][nnodes+h][ii] = 1;
+	      fimage[k][nnodes+h][ii] = 1;
 	      f = 1;
 	      break;
 	    }
@@ -767,156 +703,107 @@ void Cnf::reduce_image() {
 	  continue;
 	}
 	// mark data required for the operation
-	for(auto d : operands[idi]) {
-	  int ff = 1;
+	for(auto &s : operands[idi]) {
+	  bool ff = 1;
 	  // check if all operands are ready
-	  for(auto a : d) {
-	    int fff = 0;
+	  for(auto d : s) {
+	    ff = 0;
 	    // in the node
 	    for(int ii = 0; ii < image[k-1][j].size(); ii++) {
 	      int idii = image[k-1][j][ii];
-	      if(a == idii) {
-		fff = 1;
+	      if(d == idii) {
+		ff = 1;
 		break;
 	      }
 	    }
-	    if(fff) {
+	    if(ff) {
 	      continue;
 	    }
-	    // in the adjacent nodes
-	    for(int c : cons[j]) {
-	      for(int ii = 0; ii < image[k-1][c].size(); ii++) {
-		int idii = image[k-1][c][ii];
-		if(a == idii) {
-		  fff = 1;
+	    // coming
+	    for(int h : incoms[j]) {
+	      for(int ii = 0; ii < image[k][nnodes+h].size(); ii++) {
+		int idii = image[k][nnodes+h][ii];
+		if(d == idii) {
+		  ff = 1;
 		  break;
 		}
 	      }
-	      if(fff) {
+	      if(ff) {
 		break;
 	      }
 	    }
-	    if(fff) {
+	    if(ff) {
 	      continue;
 	    }
-	    // in the communication paths
-	    for(int h : concoms[j]) {
-	      for(int ii = 0; ii < image[k-1][nnodes+h].size(); ii++) {
-		int idii = image[k-1][nnodes+h][ii];
-		if(a == idii) {
-		  fff = 1;
-		  break;
-		}
-	      }
-	      if(fff) {
-		break;
-	      }
-	    }
-	    if(fff) {
-	      continue;
-	    }
-	    ff = 0;
 	    break;
 	  }
 	  if(!ff) {
 	    continue;
 	  }
 	  // mark operands
-	  for(auto a : d) {
-	    int fff = 0;
+	  for(auto d : s) {
+	    ff = 0;
 	    // in the node
 	    for(int ii = 0; ii < image[k-1][j].size(); ii++) {
 	      int idii = image[k-1][j][ii];
-	      if(a == idii) {
+	      if(d == idii) {
 		fimage[k-1][j][ii] = 1;
-		fff = 1;
+		ff = 1;
 		break;
 	      }
 	    }
-	    if(fff) {
+	    if(ff) {
 	      continue;
 	    }
-	    // in the adjacent nodes
-	    for(int c : cons[j]) {
-	      for(int ii = 0; ii < image[k-1][c].size(); ii++) {
-		int idii = image[k-1][c][ii];
-		if(a == idii) {
-		  fimage[k-1][c][ii] = 1;
-		  fff = 1;
+	    // coming
+	    for(int h : incoms[j]) {
+	      for(int ii = 0; ii < image[k][nnodes+h].size(); ii++) {
+		int idii = image[k][nnodes+h][ii];
+		if(d == idii) {
+		  fimage[k][nnodes+h][ii] = 1;
+		  ff = 1;
 		  break;
 		}
 	      }
-	      if(fff) {
+	      if(ff) {
 		break;
 	      }
 	    }
-	    if(fff) {
+	    if(ff) {
 	      continue;
 	    }
-	    // in the communication paths
-	    for(int h : concoms[j]) {
-	      for(int ii = 0; ii < image[k-1][nnodes+h].size(); ii++) {
-		int idii = image[k-1][nnodes+h][ii];
-		if(a == idii) {
-		  fimage[k-1][nnodes+h][ii] = 1;
-		  fff = 1;
-		  break;
-		}
-	      }
-	      if(fff) {
-		break;
-	      }
-	    }
+	    show_error("unexpected error");
 	  }
 	  f = 1;
 	  break;
 	}
 	if(!f) {
-	  show_error("solution is incomplete");
+	  show_error("incomplete solution");
 	}
       }
     }
-    // back propagate from i-nodes to exmem
-    for(int j : i_nodes) {
-      for(int i = 0; i < image[k][j].size(); i++) {
-	if(!fimage[k][j][i]) {
+    // propagate from communication paths
+    for(int h = 0; h < ncoms; h++) {
+      for(int i = 0; i < image[k][nnodes+h].size(); i++) {
+	if(!fimage[k][nnodes+h][i]) {
 	  continue;
 	}
-	int idi = image[k][j][i];
-	int f = 0;
-	for(int ii = 0; ii < image[k-1][0].size(); ii++) {
-	  int idii = image[k-1][0][ii];
-	  if(idi == idii) {
-	    fimage[k-1][0][ii] = 1;
-	    f = 1;
-	    break;
+	int idi = image[k][nnodes+h][i];
+	bool f = 0;
+	for(int j : get<0>(coms[h])) {
+	  // TODO : care ports
+	  for(int ii = 0; ii < image[k-1][j].size(); ii++) {
+	    int idii = image[k-1][j][ii];
+	    if(idi == idii) {
+	      fimage[k-1][j][ii] = 1;
+	      f = 1;
+	      break;
+	    }
 	  }
 	}
 	if(!f) {
-	  show_error("solution is incomplete");
+	  show_error("incomplete solution");
 	}
-      }
-    }
-    // back propagate in rom
-    for(int j : rom_nodes) {
-      for(int i = 0; i < image[k][j].size(); i++) {
-	if(!fimage[k][j][i]) {
-	  continue;
-	}
-	int idi = image[k][j][i];
-	int f = 0;
-	for(int ii = 0; ii < image[k-1][j].size(); ii++) {
-	  int idii = image[k-1][j][ii];
-	  if(idi == idii) {
-	    fimage[k-1][j][ii] = 1;
-	    f = 1;
-	    break;
-	  }
-	}
-	if(!f) {
-	  show_error("solution is incomplete");
-	}
-	
       }
     }
   }
@@ -933,4 +820,4 @@ void Cnf::reduce_image() {
     }
   }
 }
-*/
+
