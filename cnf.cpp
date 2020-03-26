@@ -458,6 +458,39 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	cardinality_amk(nvars, nclauses, vLits, f, j.second);
       }
     }
+    // nports
+    for(auto j : nports) {
+      // coming
+      vLits.clear();
+      for(int k = t+1; k < ncycles; k += ncontexts) {
+	for(int h : incoms[j.first]) {
+	  for(int i = 0; i < ndata; i++) {
+	    vLits.push_back(yhead + k*ncoms*ndata + h*ndata + i + 1);
+	  }
+	}
+      }
+      if(j.second.first == 1) {
+	cardinality_amo(nvars, nclauses, vLits, f);
+      }
+      else if (j.second.first > 0) {
+	cardinality_amk(nvars, nclauses, vLits, f, j.second.first);
+      }
+      // going
+      vLits.clear();
+      for(int k = t+1; k < ncycles; k += ncontexts) {
+	for(int h : outcoms[j.first]) {
+	  for(int i = 0; i < ndata; i++) {
+	    vLits.push_back(yhead + k*ncoms*ndata + h*ndata + i + 1);
+	  }
+	}
+      }
+      if(j.second.second == 1) {
+	cardinality_amo(nvars, nclauses, vLits, f);
+      }
+      else if (j.second.second > 0) {
+	cardinality_amk(nvars, nclauses, vLits, f, j.second.second);
+      }
+    }
   }
 
   // option

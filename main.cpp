@@ -132,8 +132,8 @@ int main(int argc, char** argv) {
 	catch(...) {
 	  show_error("-t must be followed by integer");
 	}
-	if(ncontexts <= 0) {
-	  show_error("the number of contexts must be more than 0");
+	if(ncontexts < 0) {
+	  show_error("the number of contexts must be more than or equal to 0");
 	}
 	break;
       case 'x':
@@ -156,6 +156,9 @@ int main(int argc, char** argv) {
 	break;
       case 'l':
 	try {
+	  if(i+1 >= argc) {
+	    throw 0;
+	  }
 	  timeout = argv[++i];
 	  char c = timeout.back();
 	  int n;
@@ -164,6 +167,9 @@ int main(int argc, char** argv) {
 	  }
 	  else {
 	    n = str2int(timeout);
+	  }
+	  if(n == 0) {
+	    timeout = "0";
 	  }
 	  if(n < 0) {
 	    throw 0;
@@ -237,8 +243,8 @@ int main(int argc, char** argv) {
 	cout << "\t           \t2 : lingeling" << endl;
 	cout << "\t           \t3 : plingeling" << endl;
 	cout << "\t-v <int> : the level of verbosing information [default = " << nverbose << "]" << endl;
-	cout << "\t           \t0 : nothing" << endl;
-	cout << "\t           \t1 : results" << endl;
+	cout << "\t           \t0 : minimum" << endl;
+	cout << "\t           \t1 : results (just -v)" << endl;
 	cout << "\t           \t2 : settings and results" << endl;
 	cout << "\t           \t3 : settings, solver outputs, and results" << endl;
 	return 0;
@@ -383,6 +389,39 @@ int main(int argc, char** argv) {
 	    }
 	    if(cnf.memsize[id] <= 0) {
 	      show_error("memsize must be more than 0", vs[1]);
+	    }
+	  }
+	}
+	if(vs[0] == ".port") {
+	  while(getline(f, l)) {
+	    vs.clear();
+	    ss.str(l);
+	    ss.clear();
+	    while(getline(ss, s, ' ')) {
+	      vs.push_back(s);
+	    }
+	    if(vs.empty()) {
+	      continue;
+	    }
+	    if(vs[0][0] == '.') {
+	      r = 0;
+	      break;
+	    }
+	    if(vs.size() != 3) {
+	      show_error("incomplete line", l);
+	    }
+	    int id = graph.get_id(vs[0]);
+	    if(id == -1) {
+	      show_error("unspecified node", vs[0]);
+	    }
+	    try {
+	      cnf.nports[id] = make_pair(str2int(vs[1]), str2int(vs[2]));
+	    }
+	    catch(...) {
+	      show_error("non-integer sizes", l);
+	    }
+	    if(cnf.nports[id].first == 0 || cnf.nports[id].second == 0) {
+	      show_error("the number of ports must not be 0", l);
 	    }
 	  }
 	}

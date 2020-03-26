@@ -14,6 +14,7 @@ public:
   bool filp = 0;
   std::map<int, std::vector<bool> > assignments;
   std::map<int, int> memsize;
+  std::map<int, std::pair<int, int> > nports;
   std::vector<std::vector<std::vector<int> > > image;
 
   Cnf(std::set<int> pes, std::set<int> mem_nodes, std::vector<std::tuple<std::set<int>, std::set<int>, int> > coms, int ninputs, std::set<int> output_ids, std::vector<std::set<std::set<int> > > operands);
