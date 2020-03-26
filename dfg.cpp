@@ -219,8 +219,7 @@ void Dfg::gen_operands_node(node *p) {
       dataname += datanames[id];
       dataname += ", ";
     }
-    dataname.pop_back();
-    dataname.pop_back();
+    dataname = dataname.substr(0, dataname.size()-2);
     dataname += ")";
     datanames.push_back(dataname);
     unique[key] = ndata++;
@@ -275,9 +274,7 @@ void Dfg::gen_operands_node(node *p) {
 	  dataname += typeopr(p->type);
 	  dataname += " ";
 	}
-	dataname.pop_back();
-	dataname.pop_back();
-	dataname.pop_back();
+	dataname = dataname.substr(0, dataname.size()-3);
 	datanames.push_back(dataname);
 	unique[keysub] = ndata++;
       }
@@ -339,9 +336,7 @@ void Dfg::gen_operands_node(node *p) {
 				     dataname += typeopr(p->type);
 				     dataname += " ";
 				   }
-				   dataname.pop_back();
-				   dataname.pop_back();
-				   dataname.pop_back();
+				   dataname = dataname.substr(0, dataname.size()-3);
 				   datanames.push_back(dataname);
 				   unique[keysub] = ndata++;
 				 });

@@ -15,6 +15,10 @@ int main(int argc, char** argv) {
   string gfilename = "g.txt";
   string pfilename = "_test.cnf";
   string rfilename = "_test.out";
+  string dfilename = "_test.dot";
+  struct {
+    string operator()(int i) { return "_image" + to_string(i) + ".png"; }
+  } ifilename;
 
   vector<string> solver_cmds = {"minisat " + pfilename + " " + rfilename,
 				"glucose " + pfilename + " " + rfilename,
@@ -25,6 +29,7 @@ int main(int argc, char** argv) {
   string rfilename_ilp = "_test.sol";
   string solver_cmd_ilp = "cplex -c \"read " + pfilename_ilp + "\" \"set emphasis mip 1\" \"set threads 1\" \"optimize\" \"write " +  rfilename_ilp + "\"";
 
+  string dot_cmd = "dot -Tpng " + dfilename;
   
   int ncycles = 0;
   int nregs = 2;
@@ -469,5 +474,92 @@ int main(int argc, char** argv) {
     }
   }
 
+  // dot file
+  {
+    map<int, string> node_id2name = graph.get_id2name();
+    auto pes = graph.get_nodes("pe");
+    auto mems = graph.get_nodes("mem");
+    auto coms = graph.get_edges("com");
+    for(int k = 0; k < cnf.image.size(); k++) {
+      ofstream f(dfilename);
+      if(!f) {
+	show_error("cannot open file", dfilename);
+      }
+      f << "digraph cycle" << k << " {" << endl;
+      f << "node [ shape = record ];" << endl;
+      for(auto j : pes) {
+	f << "n" << j << " [ label = \"{" << node_id2name[j];
+	if(!cnf.image[k][j].empty()) {
+	  f << "|{";
+	  for(int i : cnf.image[k][j]) {
+	    f << dfg.get_dataname(i) << "|";
+	  }
+	  f.seekp(-1, ios_base::cur);
+	  f << "}";
+	}
+	f << "}\" ];" << endl;
+      }
+      for(auto j : mems) {
+	f << "n" << j << " [ label = \"" << node_id2name[j];
+	if(!cnf.image[k][j].empty()) {
+	  f << "|{";
+	  for(int i : cnf.image[k][j]) {
+	    f << dfg.get_dataname(i) << "|";
+	  }
+	  f.seekp(-1, ios_base::cur);
+	  f << "}";
+	}
+	f << "\" ];" << endl;
+      }
+      for(int h = 0; h < coms.size(); h++) {
+	auto &com = coms[h];
+	if(get<0>(com).size() > 1 || get<1>(com).size() > 1) {
+	  if(cnf.image[k][graph.get_nnodes()+h].empty()) {
+	    f << "c" << h << " [ shape = point ];" << endl;
+	    for(int j : get<0>(com)) {
+	      f << "n" << j << " -> c" << h << " [ style = \"dashed\" ];" << endl;
+	    }
+	    for(int j : get<1>(com)) {
+	      f << "c" << h << " -> n" << j << " [ style = \"dashed\" ];" << endl;
+	    }
+	  }
+	  else {
+	    f << "c" << h << " [ style = \"dashed\", label =  \"{";
+	    for(int i : cnf.image[k][graph.get_nnodes()+h]) {
+	      f << dfg.get_dataname(i) << "|";
+	    }
+	    f.seekp(-1, ios_base::cur);
+	    f << "}\" ];" << endl;
+	    for(int j : get<0>(com)) {
+	      f << "n" << j << " -> c" << h << ";" << endl;
+	    }
+	    for(int j : get<1>(com)) {
+	      f << "c" << h << " -> n" << j << ";" << endl;
+	    }
+	  }
+	}
+	else {
+	  f << "n" << *get<0>(com).begin() << " -> n" << *get<1>(com).begin();
+	  if(cnf.image[k][graph.get_nnodes()+h].empty()) {
+	    f << " [ style = \"dashed\" ];" << endl;
+	  }
+	  else {
+	    f << " [ label =  \"";
+	    for(int i : cnf.image[k][graph.get_nnodes()+h]) {
+	      f << dfg.get_dataname(i) << ", ";
+	    }
+	    f.seekp(-2, ios_base::cur);
+	    f << "\" ];" << endl;
+	  }
+	}
+      }
+      f << "}" << endl;
+      f.close();
+      string cmd = dot_cmd;
+      cmd += " -o " + ifilename(k);
+      system(cmd.c_str());
+    }
+  }
+  
   return 0;
 }
