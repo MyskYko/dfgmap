@@ -235,7 +235,7 @@ int main(int argc, char** argv) {
 	cout << "\t           \t3 : plingeling" << endl;
 	cout << "\t-v <int> : the level of verbosing information [default = " << nverbose << "]" << endl;
 	cout << "\t           \t0 : minimum" << endl;
-	cout << "\t           \t1 : results (just -v)" << endl;
+	cout << "\t           \t1 : results" << endl;
 	cout << "\t           \t2 : settings and results" << endl;
 	cout << "\t           \t3 : settings, solver outputs, and results" << endl;
 	return 0;
