@@ -304,14 +304,16 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
     write_clause(nclauses, vLits, f);
   }
 
-  // conditions for PE
-  f << (filp? "\\": "c") << " conditions for PE" << endl;
+  // conditions for node
+  f << (filp? "\\": "c") << " conditions for node" << endl;
   for(int k = 1; k < ncycles; k++) {
     for(int j = 0; j < nnodes; j++) {
       for(int i = 0; i < ndata; i++) {
 	vLits.clear();
 	vLits.push_back(-(k*nnodes*ndata + j*ndata + i + 1));
-	vLits.push_back((k-1)*nnodes*ndata + j*ndata + i + 1);
+	if(tempnodes.empty() || !tempnodes[j]) {
+	  vLits.push_back((k-1)*nnodes*ndata + j*ndata + i + 1);
+	}
 	for(int h : incoms[j]) {
 	  vLits.push_back(yhead + k*ncoms*ndata + h*ndata + i + 1);
 	}
@@ -683,17 +685,19 @@ void Cnf::reduce_image() {
 	}
 	int idi = image[k][j][i];
 	bool f = 0;
-	// mark data in mem at previous cycle if possible
-	for(int ii = 0; ii < (int)image[k-1][j].size(); ii++) {
-	  int idii = image[k-1][j][ii];
-	  if(idi == idii) {
-	    fimage[k-1][j][ii] = 1;
-	    f = 1;
-	    break;
+	if(tempnodes.empty() || !tempnodes[j]) {
+	  // mark data in mem at previous cycle if possible
+	  for(int ii = 0; ii < (int)image[k-1][j].size(); ii++) {
+	    int idii = image[k-1][j][ii];
+	    if(idi == idii) {
+	      fimage[k-1][j][ii] = 1;
+	      f = 1;
+	      break;
+	    }
 	  }
-	}
-	if(f) {
-	  continue;
+	  if(f) {
+	    continue;
+	  }
 	}
 	// mark data coming
 	for(int h : incoms[j]) {
@@ -722,17 +726,19 @@ void Cnf::reduce_image() {
 	}
 	int idi = image[k][j][i];
 	bool f = 0;
-	// mark data in the pe at previous cycle if possible
-	for(int ii = 0; ii < (int)image[k-1][j].size(); ii++) {
-	  int idii = image[k-1][j][ii];
-	  if(idi == idii) {
-	    fimage[k-1][j][ii] = 1;
-	    f = 1;
-	    break;
+	if(tempnodes.empty() || !tempnodes[j]) {
+	  // mark data in the pe at previous cycle if possible
+	  for(int ii = 0; ii < (int)image[k-1][j].size(); ii++) {
+	    int idii = image[k-1][j][ii];
+	    if(idi == idii) {
+	      fimage[k-1][j][ii] = 1;
+	      f = 1;
+	      break;
+	    }
 	  }
-	}
-	if(f) {
-	  continue;
+	  if(f) {
+	    continue;
+	  }
 	}
 	// mark data coming if possible
 	for(int h : incoms[j]) {

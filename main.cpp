@@ -425,6 +425,16 @@ int main(int argc, char** argv) {
 	    }
 	  }
 	}
+	if(vs[0] == ".temp") {
+	  cnf.tempnodes.resize(graph.get_nnodes());
+	  for(int i = 1; i < (int)vs.size(); i++) {
+	    int id = graph.get_id(vs[i]);
+	    if(id == -1) {
+	      show_error("unspecified node", vs[i]);
+	    }
+	    cnf.tempnodes[id] = 1;
+	  }
+	}
       }
       if(nverbose >= 2) {
 	cout << "### option information ###" << endl;
