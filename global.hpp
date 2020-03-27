@@ -5,7 +5,6 @@
 #include <string>
 #include <functional>
 #include <algorithm>
-#include <cctype>
 
 static inline void show_error(std::string s) {
   std::cout << "error : " << s << std::endl;
