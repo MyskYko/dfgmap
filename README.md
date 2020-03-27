@@ -211,5 +211,9 @@ switches SAT solvers. make sure that a solver name runs the solver.
 switches verbosing levels.
 
 ## benchmark
-we prepared three experiments. in the directory "benchmark", codes to generate problems are located. please compile one of them and run the generated executable, then "e.txt" and "f.txt" (and "g.txt" in some cases) are generated.
+three benchmarks are prepared. in the directory "benchmark", codes to generate problems are located. please compile one of them and run the generated executable with an interger parameter, then "e.txt" and "f.txt" (and "g.txt" in some cases) are generated.
 
+under construction
+### ring.cpp
+### mmm.cpp
+### sparse.cpp
