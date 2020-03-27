@@ -446,6 +446,23 @@ int main(int argc, char** argv) {
 	  }
 	  cout << endl;
 	}
+	cout << "memory size :" << endl;
+	for(auto i : cnf.memsize) {
+	  cout << "node " << i.first << " : " << i.second << endl;
+	}
+	cout << "the number of ports :" << endl;	
+	for(auto i : cnf.nports) {
+	  cout << "node " << i.first << " : " << i.second.first << ", " << i.second.second << endl;
+	}
+	cout << "temporary nodes :" << endl;
+	if(!cnf.tempnodes.empty()) {
+	  for(int i = 0; i < graph.get_nnodes(); i++) {
+	    if(cnf.tempnodes[i]) {
+	      cout << i << ", ";
+	    }
+	  }
+	  cout << endl;
+	}
       }
     }
   }

@@ -367,7 +367,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	else {
 	  for(auto &s : operands[i]) {
 	    if(operands[i].size() != 1) {
-	      show_error("not 1 ope");
+	      show_error("unexpected error");
 	    }
 	    for(int d : s) {
 	      vLits.clear();
