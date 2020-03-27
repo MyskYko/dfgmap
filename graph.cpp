@@ -83,7 +83,7 @@ void Graph::read(string filename) {
 	}
 	recipients.insert(name2id[vs[i]]);
       }
-      int band = -1;
+      int band = 0;
       if(i < (int)vs.size() && vs[i] == ":") {
 	i++;
 	if(i == (int)vs.size()) {
@@ -93,10 +93,7 @@ void Graph::read(string filename) {
 	  band = str2int(vs[i]);
 	}
 	catch(...) {
-	  show_error("non-integer bandwidth", vs[i]);
-	}
-	if(band <= 0) {
-	  show_error("bandwidth must be more than 0", vs[i]);
+	  show_error("non-integer weight", vs[i]);
 	}
       }
       auto e = make_tuple(senders, recipients, band);

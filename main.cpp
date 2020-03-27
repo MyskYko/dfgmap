@@ -91,38 +91,30 @@ int main(int argc, char** argv) {
 	catch(...) {
 	  show_error("-n must be followed by integer");
 	}
-	if(ncycles <= 0) {
-	  show_error("the number of cycles must be more than 0");
+	if(ncycles < 0) {
+	  show_error("the number of cycles must not be negative");
 	}
 	break;
       case 'r':
-	if(i+1 >= argc || argv[i+1][0] == '-') {
-	  nregs = -1;
-	  break;
-	}
 	try {
 	  nregs = str2int(argv[++i]);
 	}
 	catch(...) {
-	  show_error("-r should be followed by integer");
+	  show_error("-r must be followed by integer");
 	}
-	if(nregs == 0) {
-	  show_error("the number of registers must be more than 0");
+	if(nregs < 0) {
+	  show_error("the number of registers must not be negative");
 	}
 	break;
       case 'p':
-	if(i+1 >= argc || argv[i+1][0] == '-') {
-	  nprocs = -1;
-	  break;
-	}
 	try {
 	  nprocs = str2int(argv[++i]);
 	}
 	catch(...) {
-	  show_error("-p should be followed by integer");
+	  show_error("-p must be followed by integer");
 	}
-	if(nprocs == 0) {
-	  show_error("the number of processors must be more than 0");
+	if(nprocs < 0) {
+	  show_error("the number of processors must not be negative");
 	}
 	break;
       case 't':
@@ -133,7 +125,7 @@ int main(int argc, char** argv) {
 	  show_error("-t must be followed by integer");
 	}
 	if(ncontexts < 0) {
-	  show_error("the number of contexts must be more than or equal to 0");
+	  show_error("the number of contexts must not be negative");
 	}
 	break;
       case 'x':
@@ -202,27 +194,26 @@ int main(int argc, char** argv) {
 	}
 	break;
       case 'v':
-	if(i+1 >= argc || argv[i+1][0] == '-') {
-	  nverbose = 1;
-	  break;
-	}
 	try {
 	  nverbose = str2int(argv[++i]);
 	}
 	catch(...) {
-	  show_error("-v should be followed by integer");
+	  show_error("-v must be followed by integer");
+	}
+	if(nverbose < 0) {
+	  show_error("the verbosing level must be between 0 and 3");
 	}
 	break;
       case 'h':
-	cout << "usage : gen <options>" << endl;
+	cout << "usage : dfgmap <options>" << endl;
 	cout << "\t-h       : show this usage" << endl;
 	cout << "\t-o       : toggle generating output image files [default = " << fout << "]" << endl;
 	cout << "\t-e <str> : the name of environment file [default = \"" << efilename << "\"]" << endl;
 	cout << "\t-f <str> : the name of formula file [default = \"" << ffilename << "\"]" << endl;
 	cout << "\t-g <str> : the name of option file [default = \"" << gfilename << "\"]" << endl;
 	cout << "\t-n <int> : the number of cycles [default = " << ncycles << "]" << endl;
-	cout << "\t-r <int> : the number of registers in each PE (just -r means no limit) [default = " << nregs << "]" << endl;
-	cout << "\t-u <int> : the number of processors in each PE (just -u means no limit) [default = " << nprocs << "]" << endl;
+	cout << "\t-r <int> : the number of registers in each PE (0 means no limit) [default = " << nregs << "]" << endl;
+	cout << "\t-u <int> : the number of processors in each PE (0 means no limit) [default = " << nprocs << "]" << endl;
 	cout << "\t-t <int> : the number of contexts for pipeline (0 means no pipelining) [default = " << ncontexts << "]" << endl;
 	cout << "\t-x       : toggle enabling external memory to store intermediate values [default = " << fextmem << "]" << endl;
 	cout << "\t-c       : toggle transforming dataflow [default = " << ftransform << "]" << endl;
@@ -345,9 +336,6 @@ int main(int argc, char** argv) {
 	    int id = graph.get_id(vs[0]);
 	    if(id == -1) {
 	      show_error("unspecified node", vs[0]);
-	    }
-	    if(graph.get_type(id) != "mem") {
-	      show_error("non-Mem node", vs[0]);
 	    }
 	    cnf.assignments[id].clear();
 	    cnf.assignments[id].resize(dfg.get_ndata());
