@@ -41,7 +41,13 @@ int main(int argc, char ** argv) {
     }
   }
   e << endl;
-  e << ".mem rom" << endl;
+  e << ".mem";
+  for(int i = 0; i < N; i++) {
+    for(int j = 0; j < N; j++) {
+      e << " rom" << i+1 << "_" << j+1;
+    }
+  }
+
   e << endl;
   e << ".com" << endl;
   for(int i = 0; i < N; i++) {
@@ -59,7 +65,7 @@ int main(int argc, char ** argv) {
   }
   for(int i = 0; i < N; i++) {
     for(int j = 0; j < N; j++) {
-      e << "rom -> pe" << i+1 << "_" << j+1 << endl;
+      e << "rom" << i+1 << "_" << j+1 << " -> pe" << i+1 << "_" << j+1 << endl;
     }
   }
   for(int j = 0; j < N; j++) {
@@ -128,16 +134,25 @@ int main(int argc, char ** argv) {
     }
   }
   g << endl;
-  g << "rom";
-  for(int i = 0; i < N; i++) {
-    for(int j = 0; j < N; j++) {
-      if(felem[j + i*N]) {
-	g << " W" << i+1 << "_" << j+1;
+  for(int i_ = 0; i_ < N; i_++) {
+    for(int j_ = 0; j_ < N; j_++) {
+      g << "rom" << i_+1 << "_" << j_+1;
+      for(int i = 0; i < N; i++) {
+	for(int j = 0; j < N; j++) {
+	  if(felem[j + i*N]) {
+	    g << " W" << i+1 << "_" << j+1;
+	  }
+	}
       }
+      g << endl;
     }
   }
-  g << endl;
-    
+  g << ".memsize" << endl;
+  for(int i = 0; i < N; i++) {
+    for(int j = 0; j < N; j++) {
+      g << "rom" << i+1 << "_" << j+1 << " 1" << endl;
+    }
+  }
   g.close();
 
   return 0;
