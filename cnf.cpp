@@ -284,9 +284,20 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
   // init condition
   f << (filp? "\\": "c") << " init condition" << endl;
   for(int j = 0; j < nnodes; j++) {
+    int nassign = 0;
+    if(assignments.count(j)) {
+      for(int i = 0; i < ndata; i++) {
+	if(assignments[j][i]) {
+	  nassign++;
+	}
+      }
+    }
     for(int i = 0; i < ndata; i++) {
       vLits.clear();
-      if(assignments.count(j) && assignments[j][i]) {
+      if(nassign && assignments[j][i]) {
+	if(memsize.count(j) && memsize[j] < nassign) {
+	  continue;
+	}
 	vLits.push_back(j*ndata + i + 1);
       }
       else {
