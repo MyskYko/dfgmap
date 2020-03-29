@@ -480,7 +480,7 @@ int main(int argc, char** argv) {
     cnf.gen_cnf(ncycles, nregs, nprocs, fextmem, ncontexts, pfilename);
     string cmd;
     if(timeout != "0") {
-      cmd = "timeout 1d ";
+      cmd = "timeout " + timeout + " ";
     }
     cmd += solver_cmd;
     if(nverbose < 3) {

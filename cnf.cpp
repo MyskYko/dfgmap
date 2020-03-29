@@ -262,7 +262,7 @@ void Cnf::cardinality_amk(int &nvars, int &nclauses, vector<int> &vLits, ofstrea
 
 void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts, string filename) {
   ncycles_ = ncycles;
-  if(!ncontexts) {
+  if(ncontexts <= 0) {
     ncontexts = ncycles;
   }
   
@@ -283,7 +283,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
   
   // init condition
   f << (filp? "\\": "c") << " init condition" << endl;
-  for(int j = 0; j < nnodes; j++) {
+  for(int j : mems) {
     int nassign = 0;
     if(assignments.count(j)) {
       for(int i = 0; i < ndata; i++) {
@@ -296,6 +296,29 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
       vLits.clear();
       if(nassign && assignments[j][i]) {
 	if(memsize.count(j) && memsize[j] < nassign) {
+	  continue;
+	}
+	vLits.push_back(j*ndata + i + 1);
+      }
+      else {
+	vLits.push_back(-(j*ndata + i + 1));
+      }
+      write_clause(nclauses, vLits, f);
+    }
+  }
+  for(int j : pes) {
+    int nassign = 0;
+    if(assignments.count(j)) {
+      for(int i = 0; i < ndata; i++) {
+	if(assignments[j][i]) {
+	  nassign++;
+	}
+      }
+    }
+    for(int i = 0; i < ndata; i++) {
+      vLits.clear();
+      if(nassign && assignments[j][i]) {
+	if(nregs > 0 && nregs < nassign) {
 	  continue;
 	}
 	vLits.push_back(j*ndata + i + 1);
