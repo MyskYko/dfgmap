@@ -375,8 +375,8 @@ int main(int argc, char** argv) {
 	    catch(...) {
 	      show_error("non-integer size", vs[1]);
 	    }
-	    if(cnf.memsize[id] <= 0) {
-	      show_error("memsize must be more than 0", vs[1]);
+	    if(cnf.memsize[id] < 0) {
+	      show_error("memsize must not be negative", vs[1]);
 	    }
 	  }
 	}
@@ -408,8 +408,8 @@ int main(int argc, char** argv) {
 	    catch(...) {
 	      show_error("non-integer sizes", l);
 	    }
-	    if(cnf.nports[id].first == 0 || cnf.nports[id].second == 0) {
-	      show_error("the number of ports must not be 0", l);
+	    if(cnf.nports[id].first < 0 || cnf.nports[id].second < 0) {
+	      show_error("the number of ports must not be negative", l);
 	    }
 	  }
 	}

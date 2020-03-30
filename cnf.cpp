@@ -262,9 +262,6 @@ void Cnf::cardinality_amk(int &nvars, int &nclauses, vector<int> &vLits, ofstrea
 
 void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts, string filename) {
   ncycles_ = ncycles;
-  if(ncontexts <= 0) {
-    ncontexts = ncycles;
-  }
   
   int nvars = ncycles * nnodes * ndata;
   yhead = nvars;
@@ -432,55 +429,68 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 
   // at most 1 or K
   f << (filp? "\\": "c") << " at most 1 or K" << endl;
+  if(ncontexts <= 0 || ncontexts > ncycles) {
+    ncontexts = ncycles;
+  }
   for(int t = 0; t < ncontexts; t++) {
     // reg
-    for(int j : pes) {
-      vLits.clear();
-      for(int k = t+1; k < ncycles; k += ncontexts) {
-	for(int i = 0; i < ndata; i++) {
-	  vLits.push_back(k*nnodes*ndata + j*ndata + i + 1);
+    if (nregs > 0) {
+      for(int j : pes) {
+	vLits.clear();
+	for(int k = t+1; k < ncycles; k += ncontexts) {
+	  for(int i = 0; i < ndata; i++) {
+	    vLits.push_back(k*nnodes*ndata + j*ndata + i + 1);
+	  }
 	}
-      }
-      if(nregs == 1) {
-	cardinality_amo(nvars, nclauses, vLits, f);
-      }
-      else if (nregs > 0) {
-	cardinality_amk(nvars, nclauses, vLits, f, nregs);
+	if(nregs == 1) {
+	  cardinality_amo(nvars, nclauses, vLits, f);
+	}
+	else {
+	  cardinality_amk(nvars, nclauses, vLits, f, nregs);
+	}
       }
     }
     // com
     for(int h = 0; h < ncoms; h++) {
+      int band = get<2>(coms[h]);
+      if(band <= 0) {
+	continue;
+      }
       vLits.clear();
       for(int k = t+1; k < ncycles; k += ncontexts) {
 	for(int i = 0; i < ndata; i++) {
 	  vLits.push_back(yhead + k*ncoms*ndata + h*ndata + i + 1);
 	}
       }
-      int band = get<2>(coms[h]);
       if(band == 1) {
 	cardinality_amo(nvars, nclauses, vLits, f);	
       }
-      else if(band > 0) {
+      else {
 	cardinality_amk(nvars, nclauses, vLits, f, band);
       }
     }
     // ope
-    for(int j : pes) {
-      vLits.clear();
-      for(int k = t+1; k < ncycles; k += ncontexts) {
-	for(int i = 0; i < ndata; i++) {
-	  vLits.push_back(zhead + k*nnodes*ndata + j*ndata + i + 1);
+    if(nprocs > 0) {
+      for(int j : pes) {
+	vLits.clear();
+	for(int k = t+1; k < ncycles; k += ncontexts) {
+	  for(int i = 0; i < ndata; i++) {
+	    vLits.push_back(zhead + k*nnodes*ndata + j*ndata + i + 1);
+	  }
 	}
-      }
-      if(nprocs == 1) {
-	cardinality_amo(nvars, nclauses, vLits, f);
-      }
-      else if(nprocs > 0) {
-	cardinality_amk(nvars, nclauses, vLits, f, nprocs);
+	if(nprocs == 1) {
+	  cardinality_amo(nvars, nclauses, vLits, f);
+	}
+	else {
+	  cardinality_amk(nvars, nclauses, vLits, f, nprocs);
+	}
       }
     }
     // memsize
     for(auto j : memsize) {
+      if(j.second <= 0) {
+	continue;
+      }
       vLits.clear();
       for(int k = t+1; k < ncycles; k += ncontexts) {
 	for(int i = 0; i < ndata; i++) {
@@ -490,41 +500,45 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
       if(j.second == 1) {
 	cardinality_amo(nvars, nclauses, vLits, f);
       }
-      else if (j.second > 0) {
+      else {
 	cardinality_amk(nvars, nclauses, vLits, f, j.second);
       }
     }
     // nports
     for(auto j : nports) {
       // coming
-      vLits.clear();
-      for(int k = t+1; k < ncycles; k += ncontexts) {
-	for(int h : incoms[j.first]) {
-	  for(int i = 0; i < ndata; i++) {
-	    vLits.push_back(yhead + k*ncoms*ndata + h*ndata + i + 1);
+      if (j.second.first > 0) {
+	vLits.clear();
+	for(int k = t+1; k < ncycles; k += ncontexts) {
+	  for(int h : incoms[j.first]) {
+	    for(int i = 0; i < ndata; i++) {
+	      vLits.push_back(yhead + k*ncoms*ndata + h*ndata + i + 1);
+	    }
 	  }
 	}
-      }
-      if(j.second.first == 1) {
-	cardinality_amo(nvars, nclauses, vLits, f);
-      }
-      else if (j.second.first > 0) {
-	cardinality_amk(nvars, nclauses, vLits, f, j.second.first);
+	if(j.second.first == 1) {
+	  cardinality_amo(nvars, nclauses, vLits, f);
+	}
+	else {
+	  cardinality_amk(nvars, nclauses, vLits, f, j.second.first);
+	}
       }
       // going
-      vLits.clear();
-      for(int k = t+1; k < ncycles; k += ncontexts) {
-	for(int h : outcoms[j.first]) {
-	  for(int i = 0; i < ndata; i++) {
-	    vLits.push_back(yhead + k*ncoms*ndata + h*ndata + i + 1);
+      if (j.second.second > 0) {
+	vLits.clear();
+	for(int k = t+1; k < ncycles; k += ncontexts) {
+	  for(int h : outcoms[j.first]) {
+	    for(int i = 0; i < ndata; i++) {
+	      vLits.push_back(yhead + k*ncoms*ndata + h*ndata + i + 1);
+	    }
 	  }
 	}
-      }
-      if(j.second.second == 1) {
-	cardinality_amo(nvars, nclauses, vLits, f);
-      }
-      else if (j.second.second > 0) {
-	cardinality_amk(nvars, nclauses, vLits, f, j.second.second);
+	if(j.second.second == 1) {
+	  cardinality_amo(nvars, nclauses, vLits, f);
+	}
+	else {
+	  cardinality_amk(nvars, nclauses, vLits, f, j.second.second);
+	}
       }
     }
   }
