@@ -266,9 +266,7 @@ void Cnf::support_port() {
     set<int> s0, s1;
     if(get<0>(com).size() > 1) {
       for(int j : get<0>(com)) {
-	cout << i << "," << j << endl;
 	if(nports.count(j) && nports[j].second) {
-	  cout << "a" << endl;
 	  outcoms[j].erase(i);
 	  set<int> senders = {j};
 	  set<int> recipients;
@@ -308,7 +306,7 @@ void Cnf::support_port() {
       coms[i] = make_tuple(s0, s1, get<2>(com));
     }
   }
-
+  /*
   cout << "com :" << endl;
   for(auto h : coms) {
     for(int j : get<0>(h)) {
@@ -332,6 +330,7 @@ void Cnf::support_port() {
     cout << h.first;
     cout << endl;
   }
+  */
 }
 
 void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts, string filename) {
