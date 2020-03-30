@@ -280,42 +280,11 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
   
   // init condition
   f << (filp? "\\": "c") << " init condition" << endl;
-  for(int j : mems) {
-    int nassign = 0;
-    if(assignments.count(j)) {
-      for(int i = 0; i < ndata; i++) {
-	if(assignments[j][i]) {
-	  nassign++;
-	}
-      }
-    }
+  for(int j = 0; j < nnodes; j++) {
     for(int i = 0; i < ndata; i++) {
       vLits.clear();
-      if(nassign && assignments[j][i]) {
-	if(memsize.count(j) && memsize[j] < nassign) {
-	  continue;
-	}
-	vLits.push_back(j*ndata + i + 1);
-      }
-      else {
-	vLits.push_back(-(j*ndata + i + 1));
-      }
-      write_clause(nclauses, vLits, f);
-    }
-  }
-  for(int j : pes) {
-    int nassign = 0;
-    if(assignments.count(j)) {
-      for(int i = 0; i < ndata; i++) {
-	if(assignments[j][i]) {
-	  nassign++;
-	}
-      }
-    }
-    for(int i = 0; i < ndata; i++) {
-      vLits.clear();
-      if(nassign && assignments[j][i]) {
-	if(nregs > 0 && nregs < nassign) {
+      if(assignments.count(j) && assignments[j][i]) {
+	if(assignments[j][i] < 0) {
 	  continue;
 	}
 	vLits.push_back(j*ndata + i + 1);
@@ -540,6 +509,22 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	  cardinality_amk(nvars, nclauses, vLits, f, j.second.second);
 	}
       }
+    }
+  }
+  // amk assign
+  for(auto j : amk_assignments) {
+    if(get<2>(j) <= 0) {
+      continue;
+    }
+    vLits.clear();
+    for(int i : get<1>(j)) {
+      vLits.push_back(get<0>(j)*ndata + i + 1);
+    }
+    if(get<2>(j) == 1) {
+      cardinality_amo(nvars, nclauses, vLits, f);
+    }
+    else {
+      cardinality_amk(nvars, nclauses, vLits, f, get<2>(j));
     }
   }
 

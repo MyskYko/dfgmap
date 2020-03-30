@@ -340,6 +340,31 @@ int main(int argc, char** argv) {
 	    cnf.assignments[id].clear();
 	    cnf.assignments[id].resize(dfg.get_ndata());
 	    for(int i = 1; i < (int)vs.size(); i++) {
+	      if(vs[i] == "{") {
+		int n;
+		try {
+		  n = str2int(vs[++i]);
+		}
+		catch(...) {
+		  show_error("unspecified size", l);
+		}
+		if(n <= 0) {
+		  show_error("non-positive size", vs[i]);
+		}
+		i++;
+		set<int> sinputs;
+		while(i < (int)vs.size() && vs[i] != "}") {
+		  int idi = dfg.input_id(vs[i]);
+		  cnf.assignments[id][idi] = -1;
+		  sinputs.insert(idi);
+		  i++;
+		}
+		if(vs[i] != "}") {
+		  show_error("incomplete line", l);
+		}
+		cnf.amk_assignments.push_back(make_tuple(id, sinputs, n));
+		continue;
+	      }
 	      cnf.assignments[id][dfg.input_id(vs[i])] = 1;
 	    }
 	  }
