@@ -137,6 +137,7 @@ int main(int argc, char ** argv) {
   for(int i_ = 0; i_ < N; i_++) {
     for(int j_ = 0; j_ < N; j_++) {
       g << "rom" << i_+1 << "_" << j_+1;
+      g << " { 1";
       for(int i = 0; i < N; i++) {
 	for(int j = 0; j < N; j++) {
 	  if(felem[j + i*N]) {
@@ -144,13 +145,8 @@ int main(int argc, char ** argv) {
 	  }
 	}
       }
+      g << " }";
       g << endl;
-    }
-  }
-  g << ".memsize" << endl;
-  for(int i = 0; i < N; i++) {
-    for(int j = 0; j < N; j++) {
-      g << "rom" << i+1 << "_" << j+1 << " 1" << endl;
     }
   }
   g.close();
