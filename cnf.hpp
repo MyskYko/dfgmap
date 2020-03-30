@@ -21,6 +21,8 @@ public:
 
   Cnf(std::set<int> pes, std::set<int> mem_nodes, std::vector<std::tuple<std::set<int>, std::set<int>, int> > coms, int ninputs, std::set<int> output_ids, std::vector<std::set<std::set<int> > > operands);
 
+  void support_port();
+  
   void gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts, std::string cnfname);
 
   void gen_image(std::string filename);
@@ -41,6 +43,8 @@ private:
 
   std::vector<std::set<int> > outcoms;
   std::vector<std::set<int> > incoms;
+
+  std::map<int, std::set<int> > bypass;
   
   int ncycles_;
   int nvars_;

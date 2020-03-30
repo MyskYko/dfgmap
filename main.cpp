@@ -449,6 +449,9 @@ int main(int argc, char** argv) {
 	  }
 	}
       }
+      if(!cnf.nports.empty()) {
+	cnf.support_port();
+      }
       if(nverbose >= 2) {
 	cout << "### option information ###" << endl;
 	cout << "assignments :" << endl;

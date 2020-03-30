@@ -260,6 +260,80 @@ void Cnf::cardinality_amk(int &nvars, int &nclauses, vector<int> &vLits, ofstrea
   }
 }
 
+void Cnf::support_port() {
+  for(int i = 0; i < ncoms; i++) {
+    auto com = coms[i];
+    set<int> s0, s1;
+    if(get<0>(com).size() > 1) {
+      for(int j : get<0>(com)) {
+	cout << i << "," << j << endl;
+	if(nports.count(j) && nports[j].second) {
+	  cout << "a" << endl;
+	  outcoms[j].erase(i);
+	  set<int> senders = {j};
+	  set<int> recipients;
+	  coms.push_back(make_tuple(senders, recipients, 0));
+	  outcoms[j].insert(ncoms);
+	  bypass[i].insert(ncoms);
+	  ncoms++;
+	}
+	else {
+	  s0.insert(j);
+	}
+      }
+    }
+    else {
+      s0 = get<0>(com);
+    }
+    if(get<1>(com).size() > 1) {
+      for(int j : get<1>(com)) {
+	if(nports.count(j) && nports[j].first) {
+	  incoms[j].erase(i);
+	  set<int> senders;
+	  set<int> recipients = {j};
+	  coms.push_back(make_tuple(senders, recipients, 0));
+	  incoms[j].insert(ncoms);
+	  bypass[ncoms].insert(i);
+	  ncoms++;
+	}
+	else {
+	  s1.insert(j);
+	}
+      }
+    }
+    else {
+      s1 = get<1>(com);
+    }
+    if(get<0>(com).size() != s0.size() || get<1>(com).size() != s1.size()) {
+      coms[i] = make_tuple(s0, s1, get<2>(com));
+    }
+  }
+
+  cout << "com :" << endl;
+  for(auto h : coms) {
+    for(int j : get<0>(h)) {
+      cout << j << " ";
+    }
+    cout << "-> ";
+    for(int j : get<1>(h)) {
+      cout << j << " ";
+    }
+    if(get<2>(h) > 0) {
+      cout << ": " << get<2>(h);
+    }
+    cout << endl;
+  }
+  cout << "bypass :" << endl;
+  for(auto h : bypass) {
+    for(int j : h.second) {
+      cout << j << " ";
+    }
+    cout << "-> ";
+    cout << h.first;
+    cout << endl;
+  }
+}
+
 void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts, string filename) {
   ncycles_ = ncycles;
   
@@ -332,6 +406,11 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	vLits.push_back(-(yhead + k*ncoms*ndata + h*ndata + i + 1));
 	for(int j : get<0>(coms[h])) {
 	  vLits.push_back((k-1)*nnodes*ndata + j*ndata + i + 1);
+	}
+	if(bypass.count(h)) {
+	  for(int h2 : bypass[h]) {
+	    vLits.push_back(yhead + k*ncoms*ndata + h2*ndata + i + 1);
+	  }
 	}
 	write_clause(nclauses, vLits, f);
       }
@@ -870,6 +949,31 @@ void Cnf::reduce_image() {
 	}
       }
     }
+    // propagate bypass
+    for(int g = 0; g < 2; g++) {
+      for(auto h : bypass) {
+	for(int i = 0; i < (int)image[k][nnodes+h.first].size(); i++) {
+	  if(!fimage[k][nnodes+h.first][i]) {
+	    continue;
+	  }
+	  int idi = image[k][nnodes+h.first][i];
+	  bool f = 0;
+	  for(int h2 : h.second) {
+	    for(int ii = 0; ii < (int)image[k][nnodes+h2].size(); ii++) {
+	      int idii = image[k][nnodes+h2][ii];
+	      if(idi == idii) {
+		fimage[k][nnodes+h2][ii] = 1;
+		f = 1;
+		break;
+	      }
+	    }
+	    if(f) {
+	      break;
+	    }
+	  }
+	}
+      }
+    }
     // propagate from communication paths
     for(int h = 0; h < ncoms; h++) {
       for(int i = 0; i < (int)image[k][nnodes+h].size(); i++) {
@@ -878,8 +982,24 @@ void Cnf::reduce_image() {
 	}
 	int idi = image[k][nnodes+h][i];
 	bool f = 0;
+	if(bypass.count(h)) {
+	  for(int h2 : bypass[h]) {
+	    for(int ii = 0; ii < (int)image[k][nnodes+h2].size(); ii++) {
+	      int idii = image[k][nnodes+h2][ii];
+	      if(idi == idii) {
+		f = 1;
+		break;
+	      }
+	    }
+	    if(f) {
+	      break;
+	    }
+	  }
+	}
+	if(f) {
+	  continue;
+	}
 	for(int j : get<0>(coms[h])) {
-	  // TODO : care ports
 	  for(int ii = 0; ii < (int)image[k-1][j].size(); ii++) {
 	    int idii = image[k-1][j][ii];
 	    if(idi == idii) {
