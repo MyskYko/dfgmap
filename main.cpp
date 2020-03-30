@@ -614,6 +614,9 @@ int main(int argc, char** argv) {
     for(int k = 0; k < (int)cnf.image.size(); k++) {
       cout << "cycle " << k << " :" << endl;
       for(int j = 0; j < (int)cnf.image[0].size(); j++) {
+	if(!node_id2name.count(j)) {
+	  continue;
+	}
 	cout << "\t" << node_id2name[j] << " :";
 	for(int i : cnf.image[k][j]) {
 	  cout << " #" << i << "=" << dfg.get_dataname(i) << ", ";
