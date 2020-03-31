@@ -95,12 +95,13 @@ currently, four options are prepared:
  - the number of ports of a component
  - temporary component
  
-the initial assignemnt specifies the set of data that a node has at the beginning of computation. by default, ExtMem has all input variables and the other components have nothing. after a line ".assign", a name of component and a set of data are written per line.
+the initial assignemnt specifies the set of data that a node has at the beginning of computation. by default, ExtMem has all input variables and the other components have nothing. after a line ".assign", a name of component and a set of data are written per line. if only a limited number of variables in a set can be assigned, surround the set with "{ K" and "}" where K is the limitation.
 ```
 .assign
 _extmem a b c
 mem d e
-one a b c d
+one { 2 a b c d }
+pe1 a
 ```
 
 the size of a Mem or ExtMem sets a limit on the number of data a Mem or ExtMem keeps at the same time. it is unlimited by default. after a line ".memsize", a name of a Mem or Extmem and its size are written per line.
@@ -117,11 +118,12 @@ the number of ports of a component restricts the number of data the component re
 _extmem 1 2
 one 1 4
 another 2 2
+pe2 1 1
 ```
 
 a temporary component cannot keep data more than one cycle. this is mainly used to express a buffer, a Mem just relaying data. names of such components are listed in a line starting with ".temp".
 ```
-.temp nexT_mem another
+.temp next_mem another
 ```
 
 ## commandline option
@@ -164,9 +166,7 @@ usage : dfgmap <options>
 ```
 
 ### -o
-generate images to visualize the result. the files are named "_image(cycle).png" where (cycle) is an integer starting from 0.
- 
-this uses graphviz to generate images. please make sure that "dot" runs graphviz.
+generate images to visualize the result. the files are named "_image(cycle).png" where (cycle) is an integer starting from 0. this uses graphviz to generate images. please make sure that "dot" runs graphviz.
 
 ### -e, -f, -g
 specify the names of input files: -e for array processor, -f for data-flow, and -g for synthesis option. it is allowed that the synthesis option file doesn't exist. 
@@ -175,10 +175,10 @@ specify the names of input files: -e for array processor, -f for data-flow, and 
 specifies the number of cycles. 0 (default value) just verifies the input files.
 
 ### -r, -u
-specify the number of regiters and the nubmer of processors in each PE. all PEs are uniform, where each PE has the same number of registers and the same number of processors.
+specify the number of regiters and the number of processors in each PE. all PEs are uniform, where each PE has the same number of registers and the same number of processors. setting 0 imposes no limit.
 
 ### -t
-specifies the number of contexts, which is assumed to be equal to the initiation interval in piepelining. although the result is not shown in the form of contexts, the mapping is done under modulo constraints and it can be wrapped into the number of contexts without violating the resource limitation.
+specifies the number of contexts, which is assumed to be equal to the initiation interval in piepelining. although the result is not shown in the form of contexts, the mapping is done under modulo constraints and it can be wrapped into the number of contexts without violating the resource limitation. setting 0 works without the modulo constraint.
 
 ### -x
 enables ExtMem to store intermediate values other than input/output variables, which is not allowed by default.
@@ -199,7 +199,7 @@ removes redundancy in the result in a deterministic way. the necessary data are 
 solves the mapping problem with incrementing the number of cycles until the problem becomes satisfiable. Note that the problem may be unsatisfiable even with an infinate number of cycles.
 
 ### -l
-sets time limit on solving each problem. this internally uses a linux command "timeout".
+sets time limit on solving each problem. this internally uses a linux command "timeout". setting 0 runs the solver without time limit.
 
 ### -d
 switches encodings of At most one constraint, where only one variable in a set of variables can be one.
@@ -208,12 +208,95 @@ switches encodings of At most one constraint, where only one variable in a set o
 switches SAT solvers. make sure that a solver name runs the solver.
 
 ### -v
-switches verbosing levels.
+switches verbosing levels. the level 0 shows the properties of the problem and the result with the elapsed time. the level 1 displays the detailed scheduling in the result. the level 2 shows the configurations of the problem read from the input files. the level 3 shows the solver's output to stdout.
 
 ## benchmark
 three benchmarks are prepared. in the directory "benchmark", codes to generate problems are located. please compile one of them and run the generated executable with an interger parameter, then "e.txt" and "f.txt" (and "g.txt" in some cases) are generated.
 
-under construction
 ### ring.cpp
+generates a problem to map matrix-vector multiplication onto a ring-connected PEs. it requires one parameter, detnoted as N.
+
+#### e.txt
+the array processor generated with N=4 is shown below. N PEs are connected in one-way ring connection. Each PE has an input connection from and an output connection to ExtMem. every path is weighted by one.
+
+<img src="https://user-images.githubusercontent.com/18373300/78001316-7eda7980-7370-11ea-8102-401240756160.png" width="200">
+
+#### f.txt
+the data-flow generated with N=4 is shown below. it calculates matrix-vector multiplication where the matrix size is N x N. the order of additions is from the first column to the last column. the operators in the data-flow are only + and *, but MAC operation, a multi-operator operation, is specified to be available in the mapping.
+
+<img src="https://user-images.githubusercontent.com/18373300/78002362-1ab8b500-7372-11ea-8c7f-d11e87065a2e.png" width="200">
+
+#### g.txt
+this problem does not use synthesis option.
+
+#### example
+the problem generated with a parameter N=4 is the same as the problem located in the project root directory, which is unsatisfiable when the number of cycles is less than 8 and satisfiable when it is more than or equal to 8.
+
+if the automatic transformation is turned on by a commandline option "-c", the minimum required number of cycles will become 7 with a change in the order of additions. run "../dfgmap -a -c" to see that the problem under the automatic transformation becomes satisfiable with 7 cycles.
+
 ### mmm.cpp
+generates a problem to map (dense) matrix multiplicatoin onto a mesh array. it requires one parameter, detnoted as N. this problem utilizes the pipelining with the number of contexts 3.
+
+#### e.txt
+the array processor consists of N x N PEs as shown below. each PE at the left has an input connection from ExtMem. each PE at the bottom has an output connection to ExtMem. PEs are connected from left to right and from top to bottom. each of these paths is weighted by one. a Mem is located for each PE and works as a ROM to provide data to the PE.
+
+<img src="https://user-images.githubusercontent.com/18373300/78004940-cf080a80-7375-11ea-8b92-bc281ee47460.png" width="200">
+
+#### f.txt
+the data-flow calculates matrix multiplication, A = W X, where the size of matrices, A, W, and X is N x N. the operations are performed in a typical order, from the first column to the last column of W. MAC operation is defined as well as + and *.
+
+#### g.txt
+in this problem, we assume that the elements of W are distributed among PEs before the computation. on the other hand, the pipelining is sought to be performed for different Xs with the same W. then, we need to exclude the elements of W from the modulo conatraints and a Mem without size limit and a path without weight are set for each PE. we define the initial assignment that the elements of X are supplied from ExtMem, while the elements of W are distributed among Mems.
+```
+.assign
+_extmem X1_1 X1_2 X1_3 X2_1 X2_2 X2_3 X3_1 X3_2 X3_3
+rom1_1 W1_1
+rom2_1 W1_2
+rom3_1 W1_3
+rom1_2 W2_1
+rom2_2 W2_2
+rom3_2 W2_3
+rom1_3 W3_1
+rom2_3 W3_2
+rom3_3 W3_3
+```
+
+#### example
+to solve the mapping under the pipelining constraints, we need to give a commandline option "-t 3", where "-t" is followed by the number of contexts (the initiation interval). this problem is satisfiable with 9 cycles. run "../dfgmap -t 3 -a" to check it.
+
 ### sparse.cpp
+generates the problem of "mmm/.cpp" with some elements in W fixed at zero. the multiplication using a zero element is skipped. this generator requires two parameters: the first one, N, is the size of matrix and PE array, and the other one, M, specifies the sparsity.
+
+the second parameter is given as a decimal number but will be converted into a N*N-digit binary number. when N=3, M=123 will be 001111011. let i and j be integers. if (i*N + j)-th digit is 0, the elemnt at (i, j) of W is fixed at 0. otherwise, that element is regarded as an arbitrary number, where its multiplication is considered valid.
+
+### e.txt
+the same as "mmm.cpp".
+
+### f.txt
+the data-flow in "mmm.cpp" is modified to skip multiplications with zero elements.
+
+### g.txt
+the assignement is modified so that each Mem has a non-zero element of W in arbitrary order. the following example is for the problem with N=3 and M=123.
+```
+.assign
+_extmem X1_1 X1_2 X1_3 X2_1 X2_2 X2_3 X3_1 X3_2 X3_3
+rom1_1 { 1 W1_1 W1_2 W2_1 W2_2 W2_3 W3_1 }
+rom2_1 { 1 W1_1 W1_2 W2_1 W2_2 W2_3 W3_1 }
+rom3_1 { 1 W1_1 W1_2 W2_1 W2_2 W2_3 W3_1 }
+rom1_2 { 1 W1_1 W1_2 W2_1 W2_2 W2_3 W3_1 }
+rom2_2 { 1 W1_1 W1_2 W2_1 W2_2 W2_3 W3_1 }
+rom3_2 { 1 W1_1 W1_2 W2_1 W2_2 W2_3 W3_1 }
+rom1_3 { 1 W1_1 W1_2 W2_1 W2_2 W2_3 W3_1 }
+rom2_3 { 1 W1_1 W1_2 W2_1 W2_2 W2_3 W3_1 }
+rom3_3 { 1 W1_1 W1_2 W2_1 W2_2 W2_3 W3_1 }
+```
+
+#### example
+when the generated is given parameters N=3 and M=123, the problem with the matrix below W will be generated.
+```
+1 1 0
+1 1 1
+1 0 0
+```
+
+the mapping with the automatic transformation under pipeling required 8 cycles, 1 cycle reduced compared to the mapping of dense matrix. run "../dfgmap -a -c -t 3" to check it. note that the mapping without the transformation also succeeds with only 8 cycles for N=3 and M=123, but the result may differ for another set of parameters.
