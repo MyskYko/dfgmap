@@ -145,6 +145,7 @@ usage : dfgmap <options>
         -i       : toggle using ILP solver instead of SAT solver [default = 0]
         -y       : toggle post processing to remove redundancy [default = 1]
         -a       : toggle doing incremental synthesis [default = 0]
+        -z       : toggle naming intermediate variables in the result [default = 1]
         -l <str> : the duration of timeout for each problem (0 means no time limit) [default = 1d]
         -d <int> : the type of at most one encoding [default = 3]
                         0 : naive
@@ -197,6 +198,9 @@ removes redundancy in the result in a deterministic way. the necessary data are 
 
 ### -a
 solves the mapping problem with incrementing the number of cycles until the problem becomes satisfiable. Note that the problem may be unsatisfiable even with an infinate number of cycles.
+
+### -z
+names intermediate variables according to the operator like "a + b". this is recursively performed, "c * (a + b)" for example. it is turned on by default, but take care that a deep data-flow may cause too long names using GB.
 
 ### -l
 sets time limit on solving each problem. this internally uses a linux command "timeout". setting 0 runs the solver without time limit.
@@ -316,4 +320,6 @@ the loop is entirely unrolled. the data-flow has 138 nodes and produces one outp
 this does not use synthesis option.
 
 #### results
-the mapping requires 52 cycles when N>=3. run "../dfgmap -a" to reproduce the result. note that generating each problem takes sometime while solving each problem takes just a few seconds.
+the mapping requires 52 cycles when N>=3. this is because the program is so sequential that it is difficult to parallelize. run "../dfgmap -a" to reproduce the result. a commandline option "-z" should be used when the result is displayed or visualized because the name of intermediate variable can be very long.
+
+note that generating each problem takes sometime while solving each problem takes just a few seconds.
