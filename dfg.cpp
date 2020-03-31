@@ -196,13 +196,13 @@ void Dfg::compress() {
   }
 }
 
-void Dfg::gen_operands_node(node *p) {
+void Dfg::gen_operands_node(node *p, bool fname) {
   if(p->id != -1) {
     return;
   }
   vector<int> cids;
   for(auto c : p->vc) {
-    gen_operands_node(c);
+    gen_operands_node(c, fname);
     cids.push_back(c->id);
   }
   if(fcommutative(p->type)) {
@@ -219,14 +219,15 @@ void Dfg::gen_operands_node(node *p) {
     oprtypes.push_back(p->type);
     operands_.push_back(sv);
     string dataname;
-    dataname += typeopr(p->type);
-    dataname += "(";
-    for(auto id : cids) {
-      dataname += datanames[id];
-      dataname += ", ";
+    if(fname) {
+      dataname += typeopr(p->type);
+      dataname += " ";
+      for(auto id : cids) {
+	dataname += datanames[id];
+	dataname += " ";
+      }
+      dataname = dataname.substr(0, dataname.size()-1);
     }
-    dataname = dataname.substr(0, dataname.size()-2);
-    dataname += ")";
     datanames.push_back(dataname);
     unique[key] = ndata++;
     p->id = unique[key];    
@@ -274,13 +275,15 @@ void Dfg::gen_operands_node(node *p) {
 	oprtypes.push_back(p->type);
 	operands_.push_back(sv);
 	string dataname;
-	for(auto id : sub) {
-	  dataname += datanames[id];
-	  dataname += " ";
+	if(fname) {
 	  dataname += typeopr(p->type);
 	  dataname += " ";
+	  for(auto id : sub) {
+	    dataname += datanames[id];
+	    dataname += " ";
+	  }
+	  dataname = dataname.substr(0, dataname.size()-1);
 	}
-	dataname = dataname.substr(0, dataname.size()-3);
 	datanames.push_back(dataname);
 	unique[keysub] = ndata++;
       }
@@ -336,13 +339,15 @@ void Dfg::gen_operands_node(node *p) {
 				   oprtypes.push_back(p->type);
 				   operands_.push_back(sv);
 				   string dataname;
-				   for(auto id : sub) {
-				     dataname += datanames[id];
-				     dataname += " ";
+				   if(fname) {
 				     dataname += typeopr(p->type);
 				     dataname += " ";
+				     for(auto id : sub) {
+				       dataname += datanames[id];
+				       dataname += " ";
+				     }
+				     dataname = dataname.substr(0, dataname.size()-1);
 				   }
-				   dataname = dataname.substr(0, dataname.size()-3);
 				   datanames.push_back(dataname);
 				   unique[keysub] = ndata++;
 				 });
@@ -350,7 +355,7 @@ void Dfg::gen_operands_node(node *p) {
   p->id = unique[key];
 }
 
-void Dfg::gen_operands(bool fmultiopr) {
+void Dfg::gen_operands(bool fmultiopr, bool fname) {
   ndata = ninputs;
   oprtypes.clear();
   oprtypes.resize(ndata);
@@ -362,7 +367,7 @@ void Dfg::gen_operands(bool fmultiopr) {
     if(!p) {
       show_error("unspecified output", s);
     }
-    gen_operands_node(p);
+    gen_operands_node(p, fname);
   }
   fmulti = 0;
   operands.clear();
@@ -581,7 +586,6 @@ void Dfg::read(string filename) {
 }
 
 void Dfg::print_operands() {
-  int d = 0;
   for(int i = ninputs; i < ndata; i++) {
     auto &a = operands[i];
     cout << i << " :" << endl;

@@ -16,7 +16,7 @@ public:
   
   void read(std::string filename);
   void compress();
-  void gen_operands(bool fmultiopr);
+  void gen_operands(bool fmultiopr, bool fname);
   
   int input_id(std::string name);
   std::set<int> output_ids();
@@ -66,7 +66,7 @@ private:
   void compress_node(node * p);
   bool support_multiopr_rec(int id, node *ope, std::vector<std::set<int> > &vs);
   void support_multiopr();
-  void gen_operands_node(node * p);
+  void gen_operands_node(node * p, bool fname);
   
   void print_node(node * p, int depth);
 };

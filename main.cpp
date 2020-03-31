@@ -51,6 +51,7 @@ int main(int argc, char** argv) {
   int nencode = 3;
   
   int nverbose = 0;
+  bool fname = 1;
 
   // read command
   for(int i = 1; i < argc; i++) {
@@ -146,6 +147,9 @@ int main(int argc, char** argv) {
       case 'a':
 	finc ^= 1;
 	break;
+      case 'z':
+	fname ^= 1;
+	break;
       case 'l':
 	try {
 	  if(i+1 >= argc) {
@@ -221,6 +225,7 @@ int main(int argc, char** argv) {
 	cout << "\t-i       : toggle using ILP solver instead of SAT solver [default = " << filp << "]" << endl;
 	cout << "\t-y       : toggle post processing to remove redundancy [default = " << freduce << "]" << endl;
 	cout << "\t-a       : toggle doing incremental synthesis [default = " << finc << "]" << endl;
+	cout << "\t-z       : toggle naming intermadiate variables in the result [default = " << fname << "]" << endl;
 	cout << "\t-l <str> : the duration of timeout for each problem (0 means no time limit) [default = " << timeout << "]" << endl;
 	cout << "\t-d <int> : the type of at most one encoding [default = " << nencode << "]" << endl;
 	cout << "\t           \t0 : naive" << endl;
@@ -272,7 +277,7 @@ int main(int argc, char** argv) {
   }
 
   // generate operand list
-  dfg.gen_operands(fmultiopr);
+  dfg.gen_operands(fmultiopr, fname);
   if(nverbose >= 2) {
     cout << "### operand list ###" << endl;
     dfg.print_operands();
@@ -619,7 +624,11 @@ int main(int argc, char** argv) {
 	}
 	cout << "\t" << node_id2name[j] << " :";
 	for(int i : cnf.image[k][j]) {
-	  cout << " #" << i << "=" << dfg.get_dataname(i) << ", ";
+	  cout << " #" << i;
+	  if(!dfg.get_dataname(i).empty()) {
+	    cout << "=" << dfg.get_dataname(i);
+	  }
+	  cout << ", ";
 	}
 	cout << endl;
       }
@@ -650,7 +659,11 @@ int main(int argc, char** argv) {
 	if(!cnf.image[k][j].empty()) {
 	  f << "|{";
 	  for(int i : cnf.image[k][j]) {
-	    f << dfg.get_dataname(i) << "|";
+	    f << " #" << i;
+	    if(!dfg.get_dataname(i).empty()) {
+	      f << "=" << dfg.get_dataname(i);
+	    }
+	    f << "|";
 	  }
 	  f.seekp(-1, ios_base::cur);
 	  f << "}";
@@ -662,7 +675,11 @@ int main(int argc, char** argv) {
 	if(!cnf.image[k][j].empty()) {
 	  f << "|{";
 	  for(int i : cnf.image[k][j]) {
-	    f << dfg.get_dataname(i) << "|";
+	    f << " #" << i;
+	    if(!dfg.get_dataname(i).empty()) {
+	      f << "=" << dfg.get_dataname(i);
+	    }
+	    f << "|";
 	  }
 	  f.seekp(-1, ios_base::cur);
 	  f << "}";
@@ -684,7 +701,11 @@ int main(int argc, char** argv) {
 	  else {
 	    f << "c" << h << " [ style = \"dashed\", label =  \"{";
 	    for(int i : cnf.image[k][graph.get_nnodes()+h]) {
-	      f << dfg.get_dataname(i) << "|";
+	      f << " #" << i;
+	      if(!dfg.get_dataname(i).empty()) {
+		f << "=" << dfg.get_dataname(i);
+	      }
+	      f << "|";
 	    }
 	    f.seekp(-1, ios_base::cur);
 	    f << "}\" ];" << endl;
@@ -704,7 +725,11 @@ int main(int argc, char** argv) {
 	  else {
 	    f << " [ label =  \"";
 	    for(int i : cnf.image[k][graph.get_nnodes()+h]) {
-	      f << dfg.get_dataname(i) << ", ";
+	      f << " #" << i;
+	      if(!dfg.get_dataname(i).empty()) {
+		f << "=" << dfg.get_dataname(i);
+	      }
+	      f << ", ";
 	    }
 	    f.seekp(-2, ios_base::cur);
 	    f << "\" ];" << endl;
