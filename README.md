@@ -132,9 +132,9 @@ the list of commandline options will be shown with commandline option "-h":
 usage : dfgmap <options>
         -h       : show this usage
         -o       : toggle generating output image files [default = 0]
-        -e <str> : the name of environment file [default = "e.txt"]
-        -f <str> : the name of formula file [default = "f.txt"]
-        -g <str> : the name of option file [default = "g.txt"]
+        -e <str> : the name of file for array processor [default = "e.txt"]
+        -f <str> : the name of file for data-flow [default = "f.txt"]
+        -g <str> : the name of file for synthesis option [default = "g.txt"]
         -n <int> : the number of cycles [default = 0]
         -r <int> : the number of registers in each PE (0 means no limit) [default = 2]
         -u <int> : the number of processors in each PE (0 means no limit) [default = 1]
