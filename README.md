@@ -211,7 +211,7 @@ switches SAT solvers. make sure that a solver name runs the solver.
 switches verbosing levels. the level 0 shows the properties of the problem and the result with the elapsed time. the level 1 displays the detailed scheduling in the result. the level 2 shows the configurations of the problem read from the input files. the level 3 shows the solver's output to stdout.
 
 ## benchmark
-three benchmarks are prepared. in the directory "benchmark", codes to generate problems are located. please compile one of them and run the generated executable with an interger parameter, then "e.txt" and "f.txt" (and "g.txt" in some cases) are generated.
+some benchmarks are prepared. in the directory "benchmark", codes to generate problems are located. please compile one of them and run the generated executable with an interger parameter, then "e.txt" and "f.txt" (and "g.txt" in some cases) are generated.
 
 ### ring.cpp
 generates a problem to map matrix-vector multiplication onto a ring-connected PEs. it requires one parameter, detnoted as N.
@@ -300,3 +300,20 @@ when the generated is given parameters N=3 and M=123, the problem with the matri
 ```
 
 the mapping with the automatic transformation under pipeling required 8 cycles, 1 cycle reduced compared to the mapping of dense matrix. run "../dfgmap -a -c -t 3" to check it. note that the mapping without the transformation also succeeds with only 8 cycles for N=3 and M=123, but the result may differ for another set of parameters.
+
+### aes.cpp
+generates a problem to map the AES calculation onto a mesh array. it requires a parameter, N.
+
+#### e.txt
+the array processor consists of N x N PEs. adjacent PEs are connected in two-way up and down, and left and right. the figure represents the array when N=3.
+
+<img src="https://user-images.githubusercontent.com/18373300/78026018-f1aa1b80-7395-11ea-84f7-39cf2cbd3feb.png" width="200">
+
+#### f.txt
+the loop is entirely unrolled. the data-flow has 138 nodes and produces one output datum from one input datum, . there is no chance of transform.
+
+#### g.txt
+this does not use synthesis option.
+
+#### results
+the mapping requires 52 cycles when N>=3. run "../dfgmap -a" to reproduce the result. note that generating each problem takes sometime while solving each problem takes just a few seconds.
