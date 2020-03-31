@@ -4,6 +4,10 @@
 using namespace std;
 
 int main(int argc, char ** argv) {
+  if(argc < 2) {
+    cout << "specify a parameter" << endl;
+    return 1;
+  }
   int N = atoi(argv[1]);
 
   ofstream e("e.txt");

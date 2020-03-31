@@ -1,9 +1,14 @@
 #include <iostream>
 #include <fstream>
+#include <cstdio>
 
 using namespace std;
 
 int main(int argc, char ** argv) {
+  if(argc < 2) {
+    cout << "specify a parameter" << endl;
+    return 1;
+  }
   int N = atoi(argv[1]);
 
   ofstream e("e.txt");
@@ -26,7 +31,6 @@ int main(int argc, char ** argv) {
   e.close();
     
   ofstream f("f.txt");
-
   f << ".i";
   for(int i = 0; i < N; i++) {
     f << " x" << i+1;
@@ -57,6 +61,8 @@ int main(int argc, char ** argv) {
     f << endl;
   }
   f.close();
+
+  remove("g.txt");
 
   return 0;
 }

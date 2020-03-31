@@ -5,6 +5,10 @@
 using namespace std;
 
 int main(int argc, char ** argv) {
+  if(argc < 3) {
+    cout << "specify two parameters" << endl;
+    return 1;
+  }
   int N = atoi(argv[1]);
   int M = atoi(argv[2]);
 

@@ -138,12 +138,18 @@ void Dfg::print_node(node *p, int depth) {
 }
 
 void Dfg::print() {
+  cout << "id to name :" << endl;
+  for(int i = 0; i < (int)datanames.size(); i++) {
+    cout << "\t" << i << " : " << datanames[i] << endl;
+  }
+  cout << "expression tree :" << endl;
   for(auto s : outputnames) {
+    cout << "\t" << s << " :" << endl;
     node * p = name2node[s];
     if(!p) {
       show_error("unspecified output", s);
     }
-    print_node(p, 0);
+    print_node(p, 1);
   }
 }
 
@@ -576,14 +582,15 @@ void Dfg::read(string filename) {
 
 void Dfg::print_operands() {
   int d = 0;
-  for(auto &a : operands) {
-    cout << "data " << d << " :" << endl;
+  for(int i = ninputs; i < ndata; i++) {
+    auto &a = operands[i];
+    cout << i << " :" << endl;
     for(auto &b : a) {
+      cout << "\t";
       for(auto c : b) {
-	cout << "\t" << setw(3) << c << ",";
+	cout << setw(3) << c << ", ";
       }
       cout << endl;
     }
-    d++;
   }
 }

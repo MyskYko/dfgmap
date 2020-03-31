@@ -106,20 +106,21 @@ void Graph::read(string filename) {
 }
 
 void Graph::print() {
-  cout << "id to node name :" << endl;
+  cout << "id to name :" << endl;
   for(auto i : name2id) {
-    cout << i.second << " : " << i.first << endl;;
+    cout << "\t" << i.second << " : " << i.first << endl;
   }
   for(auto &i : nodes) {
-    cout << i.first << " :" << endl;
+    cout << i.first << " :" << endl << "\t";
     for(auto j : i.second) {
       cout << j << ", ";
     }
     cout << endl;
   }
   for(auto &i : edges) {
-    cout << i.first << " :" << endl;    
+    cout << i.first << " :" << endl;
     for(auto &h : i.second) {
+      cout << "\t";
       for(int j : get<0>(h)) {
 	cout << j << " ";
       }

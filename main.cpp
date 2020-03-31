@@ -208,9 +208,9 @@ int main(int argc, char** argv) {
 	cout << "usage : dfgmap <options>" << endl;
 	cout << "\t-h       : show this usage" << endl;
 	cout << "\t-o       : toggle generating output image files [default = " << fout << "]" << endl;
-	cout << "\t-e <str> : the name of environment file [default = \"" << efilename << "\"]" << endl;
-	cout << "\t-f <str> : the name of formula file [default = \"" << ffilename << "\"]" << endl;
-	cout << "\t-g <str> : the name of option file [default = \"" << gfilename << "\"]" << endl;
+	cout << "\t-e <str> : the name of file for array processor [default = \"" << efilename << "\"]" << endl;
+	cout << "\t-f <str> : the name of file for data-flow [default = \"" << ffilename << "\"]" << endl;
+	cout << "\t-g <str> : the name of file for synthesis option (ignored if not exist) [default = \"" << gfilename << "\"]" << endl;
 	cout << "\t-n <int> : the number of cycles [default = " << ncycles << "]" << endl;
 	cout << "\t-r <int> : the number of registers in each PE (0 means no limit) [default = " << nregs << "]" << endl;
 	cout << "\t-u <int> : the number of processors in each PE (0 means no limit) [default = " << nprocs << "]" << endl;
@@ -245,20 +245,20 @@ int main(int argc, char** argv) {
     }
   }
 
-  // read environment file
+  // read array processor file
   Graph graph;
   graph.create_node("mem", "_extmem");
   graph.read(efilename);
   if(nverbose >= 2) {
-    cout << "### environment information ###" << endl;
+    cout << "### array processor ###" << endl;
     graph.print();
   }
 
-  // read formula file
+  // read data-flow file
   Dfg dfg;
   dfg.read(ffilename);
   if(nverbose >= 2) {
-    cout << "### formula information ###" << endl;
+    cout << "### data-flow ###" << endl;
     dfg.print();
   }
 
@@ -266,7 +266,7 @@ int main(int argc, char** argv) {
   if(ftransform) {
     dfg.compress();
     if(nverbose >= 2) {
-      cout << "### formula after compression ###" << endl;
+      cout << "### data-flow after compression ###" << endl;
       dfg.print();
     }
   }
@@ -453,7 +453,7 @@ int main(int argc, char** argv) {
 	cnf.support_port();
       }
       if(nverbose >= 2) {
-	cout << "### option information ###" << endl;
+	cout << "### synthesis option ###" << endl;
 	cout << "assignments :" << endl;
 	for(auto i : cnf.assignments) {
 	  cout << "node " << i.first << " :" << endl;
