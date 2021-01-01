@@ -296,6 +296,7 @@ int main(int argc, char** argv) {
     cnf.nencode = nencode;
     cnf.fmulti = dfg.get_fmulti();
     cnf.filp = filp;
+    cnf.priority = dfg.get_priority();
 
     // read option file
     ifstream f(gfilename);

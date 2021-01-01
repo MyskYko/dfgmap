@@ -172,7 +172,7 @@ void Dfg::compress_node(node *p) {
     vector<node *> vcn;
     for(int i = 0; i < (int)p->vc.size(); i++) {
       auto c = p->vc[i];
-      if(p->type == c->type) {
+      if(!c->dependent && p->type == c->type) {
 	p->vc.insert(p->vc.begin() + i + 1, c->vc.begin(), c->vc.end());
       }
       else {
@@ -217,6 +217,7 @@ void Dfg::gen_operands_node(node *p, bool fname) {
     set<vector<int> > sv;
     sv.insert(cids);
     oprtypes.push_back(p->type);
+    dependents.push_back(p->dependent);
     operands_.push_back(sv);
     string dataname;
     if(fname) {
@@ -273,6 +274,7 @@ void Dfg::gen_operands_node(node *p, bool fname) {
 	  sv.insert(v);	  
 	}
 	oprtypes.push_back(p->type);
+	dependents.push_back(p->dependent);
 	operands_.push_back(sv);
 	string dataname;
 	if(fname) {
@@ -337,6 +339,7 @@ void Dfg::gen_operands_node(node *p, bool fname) {
 				     sv.insert(v);
 				   }
 				   oprtypes.push_back(p->type);
+				   dependents.push_back(p->dependent);
 				   operands_.push_back(sv);
 				   string dataname;
 				   if(fname) {
@@ -359,6 +362,8 @@ void Dfg::gen_operands(bool fmultiopr, bool fname) {
   ndata = ninputs;
   oprtypes.clear();
   oprtypes.resize(ndata);
+  dependents.clear();
+  dependents.resize(ndata);
   operands_.clear();
   operands_.resize(ndata);
   unique.clear();
@@ -393,7 +398,7 @@ bool Dfg::support_multiopr_rec(int id, node *ope, vector<set<int> > &vs) {
     }
     return 1;
   }
-  if(oprtypes[id] != ope->type) {
+  if(dependents[id] || oprtypes[id] != ope->type) {
     return 0;
   }
   set<set<int> > ss;
@@ -447,9 +452,12 @@ bool Dfg::support_multiopr_rec(int id, node *ope, vector<set<int> > &vs) {
 
 void Dfg::support_multiopr() {
   for(auto multiopr : multioprs) {
-    for(int i = 0; i < ndata; i++) {
+    for(int i = 0; i < ndata; i++) { 
       vector<set<int> > vs(1);
+      bool tmp = dependents[i];
+      dependents[i] = 0;
       bool r = support_multiopr_rec(i, multiopr, vs);
+      dependents[i] = tmp;
       if(r) {
 	operands[i].insert(vs.begin(), vs.end());
       }
@@ -581,8 +589,69 @@ void Dfg::read(string filename) {
 	create_node(vs);
       }
     }
+    if(vs[0] == ".p") {
+      while(getline(f, l)) {
+	vs.clear();
+	ss.str(l);
+	ss.clear();
+	while(getline(ss, s, ' ')) {
+	  vs.push_back(s);
+	}
+	if(vs.empty()) {
+	  continue;
+	}
+	if(vs[0][0] == '.') {
+	  r = 0;
+	  break;
+	}
+	if(vs.size() < 3) {
+	  show_error("incomplete line", l);
+	}
+	node * p, * q;
+	p = name2node[vs[0]];
+	if(!p) {
+	  show_error("unspecified data", vs[0]);
+	}
+	p->dependent = true;
+	for(int i = 1; i < (int)vs.size(); i += 2) {
+	  q = name2node[vs[i+1]];
+	  if(!q) {
+	    show_error("unspecified data", vs[i+1]);
+	  }
+	  q->dependent = true;
+	  if(vs[i] == ">") {
+	    priority.push_back(make_tuple(p, q, false));
+	  }
+	  else if(vs[i] == ">=") {
+	    priority.push_back(make_tuple(p, q, true));
+	  }
+	  else if(vs[i] == "<") {
+	    priority.push_back(make_tuple(q, p, false));
+	  }
+	  else if(vs[i] == "<=") {
+	    priority.push_back(make_tuple(q, p, true));
+	  }
+	  else if(vs[i] == "=") {
+	    priority.push_back(make_tuple(p, q, true));
+	    priority.push_back(make_tuple(q, p, true));
+	  }
+	  else {
+	    show_error("unknown comparison operator", vs[i]);
+	  }
+	  p = q;
+	}
+      }
+    }
   }
   f.close();
+}
+
+std::vector<std::tuple<int, int, bool> > Dfg::get_priority() {
+  std::vector<std::tuple<int, int, bool> > v;
+  for(auto &t : priority) {
+    v.push_back(make_tuple((get<0>(t))->id, (get<1>(t))->id, get<2>(t)));
+  }
+  return v;
 }
 
 void Dfg::print_operands() {

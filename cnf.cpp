@@ -606,6 +606,42 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
     }
   }
 
+  // priority
+  if(!priority.empty()) {
+    set<int> s;
+    for(auto &t : priority) {
+      s.insert(get<0>(t));
+    }
+    map<int, vector<int> > m;
+    for(int i : s) {
+      for(int k = 0; k < ncycles; k++) {
+	nvars++;
+	vLits.clear();
+	vLits.push_back(-nvars);
+	for(int j = 0; j < nnodes; j++) {
+	  vLits.push_back(k*nnodes*ndata + j*ndata + i + 1);
+	}
+	write_clause(nclauses, vLits, f);
+	m[i].push_back(nvars);
+      }
+    }
+    for(auto &t : priority) {
+      int i0 = get<0>(t);
+      int i1 = get<1>(t);
+      for(int k1 = 1; k1 < ncycles; k1++) {
+	int k0 = get<2>(t)? k1: k1 - 1;
+	for(int j1 : pes) {
+	  vLits.clear();
+	  vLits.push_back(-(zhead + k1*nnodes*ndata + j1*ndata + i1 + 1));
+	  for(int k = 0; k <= k0; k++) {
+	    vLits.push_back(m[i0][k]);
+	  }
+	  write_clause(nclauses, vLits, f);
+	}
+      }
+    }
+  }
+
   // option
   if(!fextmem) {
     f << (filp? "\\": "c") << " not fextmem" << endl;
@@ -632,7 +668,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
       }
     }
   }
-
+  
   if(filp) {
     f << "binary" << endl;
     for(int i = 0; i < nvars; i++) {

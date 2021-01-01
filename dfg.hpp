@@ -13,6 +13,7 @@ public:
   bool get_fmulti() { return fmulti; }
   std::string get_dataname(int i) { return datanames[i]; }
   std::vector<std::set<std::set<int> > > get_operands() { return operands; }
+  std::vector<std::tuple<int, int, bool> > get_priority();
   
   void read(std::string filename);
   void compress();
@@ -29,6 +30,7 @@ private:
     int type;
     std::vector<struct node_ *> vc;
     int id;
+    bool dependent = false;
   } node;
   
   typedef struct opr_ {
@@ -49,7 +51,9 @@ private:
   std::vector<node *> multioprs;
   std::vector<std::set<std::vector<int> > > operands_;
   std::vector<int> oprtypes;
+  std::vector<bool> dependents;
   std::map<std::pair<int, std::vector<int> >, int> unique;
+  std::vector<std::tuple<node *, node *, bool> > priority;
   
   int oprtype(std::string s);
   std::string typeopr(int i);
