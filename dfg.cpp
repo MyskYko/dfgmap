@@ -8,6 +8,15 @@
 
 using namespace std;
 
+Dfg::~Dfg() {
+  for(auto * p : oprs) {
+    delete p;
+  }
+  for(auto * p : nodes) {
+    delete p;
+  }
+}
+
 void Dfg::create_opr(string s, int n, bool fc, bool fa) {
   opr * p = new opr;
   p->s = s;

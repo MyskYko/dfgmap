@@ -24,6 +24,8 @@ public:
   
   void print();
   void print_operands();
+
+  ~Dfg();
   
 private:
   typedef struct node_ {
