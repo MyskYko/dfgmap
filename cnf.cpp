@@ -7,7 +7,7 @@
 
 using namespace std;
 
-Cnf::Cnf(set<int> pes, set<int> mems, vector<tuple<set<int>, set<int>, int> > coms, int ninputs, set<int> output_ids, vector<set<set<int> > > operands) :ninputs(ninputs), pes(pes), mems(mems), coms(coms), output_ids(output_ids), operands(operands)
+Cnf::Cnf(set<int> pes, set<int> mems, vector<tuple<set<int>, set<int>, int> > coms, int ninputs, set<int> output_ids, vector<vector<set<int> > > operands) :ninputs(ninputs), pes(pes), mems(mems), coms(coms), output_ids(output_ids), operands(operands)
 {
   nnodes = pes.size() + mems.size();
   ndata = operands.size();
@@ -341,6 +341,10 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
   nvars += ncycles * ncoms * ndata;
   zhead = nvars;
   nvars += ncycles * nnodes * ndata;
+  phead = nvars;
+  nvars += ncycles * nnodes * nexs;
+  qhead = nvars;
+  nvars += nsels;
   int nclauses = 0;
   
   ofstream f(filename);
@@ -423,16 +427,34 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
       for(int i = 0; i < ndata; i++) {
 	if(fmulti) {
 	  int nvars_ = nvars;
-	  for(auto &s : operands[i]) {
+	  for(int si = 0; si < (int)operands[i].size(); si++) {
+	    auto &s = operands[i][si];
 	    nvars++;
 	    for(int d : s) {
 	      vLits.clear();
 	      vLits.push_back(-nvars);
-	      vLits.push_back((k-1)*nnodes*ndata + j*ndata + d + 1);
-	      for(int h : incoms[j]) {
-		vLits.push_back(yhead + k*ncoms*ndata + h*ndata + d + 1);
+	      if(d < 0) {
+		vLits.push_back(phead + k*nnodes*nexs + j*nexs - d);
+	      }
+	      else {
+		vLits.push_back((k-1)*nnodes*ndata + j*ndata + d + 1);
+		for(int h : incoms[j]) {
+		  vLits.push_back(yhead + k*ncoms*ndata + h*ndata + d + 1);
+		}
 	      }
 	      write_clause(nclauses, vLits, f);
+	    }
+	    if(nexs) {
+	      auto &excond = exconds[i][si];
+	      for(auto &e: excond) {
+		if(!e.second) {
+		  continue;
+		}
+		vLits.clear();
+		vLits.push_back(-nvars);
+		vLits.push_back(qhead + e.first + 1);
+		write_clause(nclauses, vLits, f);
+	      }
 	    }
 	  }
 	  vLits.clear();
@@ -450,9 +472,14 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	    for(int d : s) {
 	      vLits.clear();
 	      vLits.push_back(-(zhead + k*nnodes*ndata + j*ndata + i + 1));
-	      vLits.push_back((k-1)*nnodes*ndata + j*ndata + d + 1);
-	      for(int h : incoms[j]) {
-		vLits.push_back(yhead + k*ncoms*ndata + h*ndata + d + 1);
+	      if(d < 0) {
+		vLits.push_back(phead + k*nnodes*nexs + j*nexs - d);
+	      }
+	      else {
+		vLits.push_back((k-1)*nnodes*ndata + j*ndata + d + 1);
+		for(int h : incoms[j]) {
+		  vLits.push_back(yhead + k*ncoms*ndata + h*ndata + d + 1);
+		}
 	      }
 	      write_clause(nclauses, vLits, f);
 	    }
@@ -470,6 +497,76 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	vLits.clear();
 	vLits.push_back(-(zhead + k*nnodes*ndata + j*ndata + i + 1));
 	write_clause(nclauses, vLits, f);
+      }
+    }
+  }
+
+  // extra nodes
+  for(int k = 0; k < ncycles; k++) {
+    for(int j : pes) {
+      for(auto &ex: exs) {
+	int nc = get<3>(ex).size();
+	for(int i = 0; i < nc; i++) {
+	  int nvars_ = nvars;
+	  for(int ii = 0; ii < nc; ii++) {
+	    int d = get<3>(ex)[ii];
+	    nvars++;
+	    vLits.clear();
+	    vLits.push_back(-nvars);	
+	    if(d < 0) {
+	      vLits.push_back(phead + k*nnodes*nexs + j*nexs - d);
+	    }
+	    else {
+	      vLits.push_back((k-1)*nnodes*ndata + j*ndata + d + 1);
+	      for(int h : incoms[j]) {
+		vLits.push_back(yhead + k*ncoms*ndata + h*ndata + d + 1);
+	      }
+	    }
+	    write_clause(nclauses, vLits, f);
+	    vLits.clear();
+	    vLits.push_back(-nvars);
+	    int s = get<2>(ex);
+	    if(get<0>(ex)) {
+	      s += i * nc + ii;
+	    }
+	    else {
+	      s += (ii - i + nc) % nc;
+	    }
+	    vLits.push_back(qhead + s + 1);
+	    write_clause(nclauses, vLits, f);
+	  }
+	  vLits.clear();
+	  vLits.push_back(-(phead + k*nnodes*nexs + j*nexs + i + get<1>(ex) + 1));
+	  for(int l = nvars_ + 1; l <= nvars; l++) {
+	    vLits.push_back(l);
+	  }
+	  write_clause(nclauses, vLits, f);
+	}
+	// amo and alo for i
+	for(int i = 0; i < nc; i++) {
+	  vLits.clear();
+	  for(int ii = 0; ii < nc; ii++) {
+	    int s = get<2>(ex) + i * nc + ii;
+	    vLits.push_back(qhead + s + 1);
+	  }
+	  write_clause(nclauses, vLits, f);
+	  cardinality_amo(nvars, nclauses, vLits, f);
+	  if(!get<0>(ex)) {
+	    break;
+	  }
+	}
+	// amo and alo for ii
+	if(get<0>(ex)) {
+	  for(int ii = 0; ii < nc; ii++) {
+	    vLits.clear();
+	    for(int i = 0; i < nc; i++) {
+	      int s = get<2>(ex) + i * nc + ii;
+	      vLits.push_back(qhead + s + 1);
+	    }
+	    write_clause(nclauses, vLits, f);
+	    cardinality_amo(nvars, nclauses, vLits, f);
+	  }
+	}
       }
     }
   }
@@ -798,6 +895,59 @@ void Cnf::gen_image(string filename) {
 	}
       }
     }
+  }
+
+  if(nexs == 0) {
+    return;
+  }
+  exmap.clear();
+  for(auto &ex: exs) {
+    int nc = get<3>(ex).size();
+    for(int i = 0; i < nc; i++) {
+      for(int ii = 0; ii < nc; ii++) {
+	int s = get<2>(ex);
+	if(get<0>(ex)) {
+	  s += i * nc + ii;
+	}
+	else {
+	  s += (ii - i + nc) % nc;
+	}
+	if(results[qhead + s]) {
+	  int exid = get<1>(ex) + i;
+	  exmap[exid] = get<3>(ex)[ii];
+	  while(exmap[exid] < 0) {
+	    exmap[exid] = exmap[-exmap[exid]-1];
+	  }
+	  break;
+	}
+      }
+    }
+  }
+  for(int i = 0; i < ndata; i++) {
+    vector<set<int> > vs;
+    for(int j = 0; j < (int)operands[i].size(); j++) {
+      bool ff = 0;
+      for(auto &e : exconds[i][j]) {
+	if(results[qhead + e.first] != e.second) {
+	  ff = 1;
+	  break;
+	}
+      }
+      if(ff) {
+	continue;
+      }
+      set<int> s;
+      for(int k: operands[i][j]) {
+	if(k < 0) {
+	  s.insert(exmap[-k-1]);
+	}
+	else {
+	  s.insert(k);
+	}
+      }
+      vs.push_back(s);
+    }
+    operands[i] = vs;
   }
 }
 

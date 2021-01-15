@@ -19,8 +19,14 @@ public:
   std::vector<int> tempnodes;
   std::vector<std::tuple<int, int, bool> > priority;
   std::vector<std::vector<std::vector<int> > > image;
+  std::map<int, int> exmap;
 
-  Cnf(std::set<int> pes, std::set<int> mem_nodes, std::vector<std::tuple<std::set<int>, std::set<int>, int> > coms, int ninputs, std::set<int> output_ids, std::vector<std::set<std::set<int> > > operands);
+  int nexs = 0;
+  int nsels = 0;
+  std::vector<std::tuple<bool, int, int, std::vector<int> > > exs;
+  std::vector<std::vector<std::map<int, bool> > > exconds;
+
+  Cnf(std::set<int> pes, std::set<int> mem_nodes, std::vector<std::tuple<std::set<int>, std::set<int>, int> > coms, int ninputs, std::set<int> output_ids, std::vector<std::vector<std::set<int> > > operands);
 
   void support_port();
   
@@ -40,7 +46,7 @@ private:
   std::set<int> mems;
   std::vector<std::tuple<std::set<int>, std::set<int>, int> > coms;
   std::set<int> output_ids;
-  std::vector<std::set<std::set<int> > > operands;
+  std::vector<std::vector<std::set<int> > > operands;
 
   std::vector<std::set<int> > outcoms;
   std::vector<std::set<int> > incoms;
@@ -51,6 +57,9 @@ private:
   int nvars_;
   int yhead;
   int zhead;
+
+  int phead;
+  int qhead;
 
   void write_clause(int &nclauses, std::vector<int> &vLits, std::ofstream &f);
   void amo_naive(int &nclauses, std::vector<int> &vLits, std::ofstream &f);

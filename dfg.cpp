@@ -131,18 +131,30 @@ void Dfg::create_node(vector<string> &vs) {
   name2node[vs[0]] = create_node(vs, pos);
 }
 
-void Dfg::print_node(node *p, int depth) {
+void Dfg::print_node(node *p, int depth, int exind = 0) {
   for(int i = 0; i < depth; i++) {
     cout << "\t";
   }
-  if(p->type < 0) {
+  if(p->type == -1) {
     cout << p->id << endl;
+  }
+  else if(p->type < 0) {
+    cout << p->type << "(" << p << "," << exind << ")" << endl;
   }
   else {
     cout << typeopr(p->type) << endl;
   }
-  for(auto c : p->vc) {
-    print_node(c, depth + 1);
+  if(exind) {
+    return;
+  }
+  for(int i = 0; i < (int)p->vc.size(); i++) {
+    auto c = p->vc[i];
+    if(i < (int)p->exind.size()) {
+      print_node(c, depth + 1, p->exind[i]);
+    }
+    else {
+      print_node(c, depth + 1);
+    }
   }
 }
 
@@ -205,14 +217,287 @@ void Dfg::compress() {
   }
 }
 
+void Dfg::insert_xbtree_node(node *p) {
+  if(p->type < 0) {
+    return;
+  }
+  if(p->vc.size() > 2 && fassociative(p->type) && fcommutative(p->type)) {
+    node * q = new node;
+    q->id = -1;
+    q->type = -3;
+    q->vc = p->vc;
+    nodes.push_back(q);
+    if(p->vc.size() == 3) {
+      node * r = new node;
+      r->id = -1;
+      r->type = p->type;
+      r->vc.push_back(q);
+      r->exind.push_back(0);
+      r->vc.push_back(q);
+      r->exind.push_back(1);
+      nodes.push_back(r);
+      p->vc.clear();
+      p->vc.push_back(q);
+      p->exind.push_back(2);
+      p->vc.push_back(r);
+    }
+    else if(p->vc.size() == 4) {
+      node * r = new node;
+      r->id = -1;
+      r->type = p->type;
+      r->vc.push_back(q);
+      r->exind.push_back(0);
+      r->vc.push_back(q);
+      r->exind.push_back(1);
+      nodes.push_back(r);
+      node * s = new node;
+      s->id = -1;
+      s->type = -2;
+      s->vc.push_back(q);
+      s->exind.push_back(2);
+      s->vc.push_back(r);
+      nodes.push_back(s);
+      node * t = new node;
+      t->id = -1;
+      t->type = p->type;
+      t->vc.push_back(q);
+      t->exind.push_back(3);
+      t->vc.push_back(s);
+      t->exind.push_back(0);
+      nodes.push_back(t);
+      p->vc.clear();
+      p->vc.push_back(s);
+      p->exind.push_back(1);
+      p->vc.push_back(t);
+    }
+    else if(p->vc.size() == 5) {
+      node * r = new node;
+      r->id = -1;
+      r->type = p->type;
+      r->vc.push_back(q);
+      r->exind.push_back(0);
+      r->vc.push_back(q);
+      r->exind.push_back(1);
+      nodes.push_back(r);
+      node * s = new node;
+      s->id = -1;
+      s->type = -2;
+      s->vc.push_back(q);
+      s->exind.push_back(2);
+      s->vc.push_back(r);
+      nodes.push_back(s);
+      node * t = new node;
+      t->id = -1;
+      t->type = p->type;
+      t->vc.push_back(q);
+      t->exind.push_back(3);
+      t->vc.push_back(s);
+      t->exind.push_back(0);
+      nodes.push_back(t);
+      node * u = new node;
+      u->id = -1;
+      u->type = -2;
+      u->vc.push_back(q);
+      u->exind.push_back(4);
+      u->vc.push_back(t);
+      nodes.push_back(u);
+      node * v = new node;
+      v->id = -1;
+      v->type = p->type;
+      v->vc.push_back(s);
+      v->exind.push_back(1);
+      v->vc.push_back(u);
+      v->exind.push_back(0);
+      nodes.push_back(v);
+      p->vc.clear();
+      p->vc.push_back(u);
+      p->exind.push_back(1);
+      p->vc.push_back(v);
+    }
+    else if(p->vc.size() == 6) {
+      node * r = new node;
+      r->id = -1;
+      r->type = p->type;
+      r->vc.push_back(q);
+      r->exind.push_back(0);
+      r->vc.push_back(q);
+      r->exind.push_back(1);
+      nodes.push_back(r);
+      node * s = new node;
+      s->id = -1;
+      s->type = -2;
+      s->vc.push_back(q);
+      s->exind.push_back(2);
+      s->vc.push_back(r);
+      nodes.push_back(s);
+      node * t = new node;
+      t->id = -1;
+      t->type = p->type;
+      t->vc.push_back(q);
+      t->exind.push_back(3);
+      t->vc.push_back(s);
+      t->exind.push_back(0);
+      nodes.push_back(t);
+      node * u = new node;
+      u->id = -1;
+      u->type = -2;
+      u->vc.push_back(q);
+      u->exind.push_back(4);
+      u->vc.push_back(t);
+      nodes.push_back(u);
+      node * v = new node;
+      v->id = -1;
+      v->type = p->type;
+      v->vc.push_back(s);
+      v->exind.push_back(1);
+      v->vc.push_back(u);
+      v->exind.push_back(0);
+      nodes.push_back(v);
+      node * w = new node;
+      w->id = -1;
+      w->type = -2;
+      w->vc.push_back(q);
+      w->exind.push_back(5);
+      w->vc.push_back(v);
+      nodes.push_back(w);
+      node * x = new node;
+      x->id = -1;
+      x->type = p->type;
+      x->vc.push_back(u);
+      x->exind.push_back(1);
+      x->vc.push_back(w);
+      x->exind.push_back(0);
+      nodes.push_back(x);
+      p->vc.clear();
+      p->vc.push_back(w);
+      p->exind.push_back(1);
+      p->vc.push_back(x);
+    }
+    else if(p->vc.size() == 7) {
+      node * r = new node;
+      r->id = -1;
+      r->type = p->type;
+      r->vc.push_back(q);
+      r->exind.push_back(0);
+      r->vc.push_back(q);
+      r->exind.push_back(1);
+      nodes.push_back(r);
+      node * s = new node;
+      s->id = -1;
+      s->type = -2;
+      s->vc.push_back(q);
+      s->exind.push_back(2);
+      s->vc.push_back(q);
+      s->exind.push_back(3);
+      s->vc.push_back(r);
+      nodes.push_back(s);
+      node * t = new node;
+      t->id = -1;
+      t->type = p->type;
+      t->vc.push_back(q);
+      t->exind.push_back(4);
+      t->vc.push_back(s);
+      t->exind.push_back(0);
+      nodes.push_back(t);
+      node * u = new node;
+      u->id = -1;
+      u->type = -2;
+      u->vc.push_back(q);
+      u->exind.push_back(5);
+      u->vc.push_back(t);
+      nodes.push_back(u);
+      node * v = new node;
+      v->id = -1;
+      v->type = p->type;
+      v->vc.push_back(s);
+      v->exind.push_back(1);
+      v->vc.push_back(u);
+      v->exind.push_back(0);
+      nodes.push_back(v);
+      node * w = new node;
+      w->id = -1;
+      w->type = -2;
+      w->vc.push_back(q);
+      w->exind.push_back(6);
+      w->vc.push_back(v);
+      nodes.push_back(w);
+      node * x = new node;
+      x->id = -1;
+      x->type = p->type;
+      x->vc.push_back(u);
+      x->exind.push_back(1);
+      x->vc.push_back(w);
+      x->exind.push_back(0);
+      nodes.push_back(x);
+      node * y = new node;
+      y->id = -1;
+      y->type = -2;
+      y->vc.push_back(s);
+      y->exind.push_back(2);
+      y->vc.push_back(x);
+      nodes.push_back(y);
+      node * z = new node;
+      z->id = -1;
+      z->type = p->type;
+      z->vc.push_back(w);
+      z->exind.push_back(1);
+      z->vc.push_back(y);
+      z->exind.push_back(0);
+      nodes.push_back(z);
+      p->vc.clear();
+      p->vc.push_back(y);
+      p->exind.push_back(1);
+      p->vc.push_back(z);
+    }
+    else {
+      show_error("currently more than 7 input xbtree is not supported");
+    }
+    p = q;
+  }
+  for(auto c : p->vc) {
+    insert_xbtree_node(c);
+  }
+}
+
+void Dfg::insert_xbtree() {
+  for(auto s : outputnames) {
+    node * p = name2node[s];
+    if(!p) {
+      show_error("unspecified output", s);
+    }
+    insert_xbtree_node(p);
+  }
+}
+
 void Dfg::gen_operands_node(node *p, bool fname) {
   if(p->id != -1) {
     return;
   }
   vector<int> cids;
-  for(auto c : p->vc) {
+  for(int i = 0; i < (int)p->vc.size(); i++) {
+    auto c = p->vc[i];
     gen_operands_node(c, fname);
-    cids.push_back(c->id);
+    if(c->type < -1) {
+      cids.push_back(-(c->id + 1 + p->exind[i]));
+    }
+    else {
+      cids.push_back(c->id);
+    }
+  }
+  if(p->type < -1) {
+    p->id = nexs;
+    exs.push_back(make_tuple(p->type == -3, nexs, nsels, cids));
+    nexs += cids.size();
+    if(p->type == -2) {
+      nsels += cids.size();
+    }
+    else if(p->type == -3) {
+      nsels += cids.size() * cids.size();
+    }
+    else {
+      show_error("unexpected error");
+    }
+    return;
   }
   if(fcommutative(p->type)) {
     sort(cids.begin(), cids.end());
@@ -233,7 +518,12 @@ void Dfg::gen_operands_node(node *p, bool fname) {
       dataname += typeopr(p->type);
       dataname += " ";
       for(auto id : cids) {
-	dataname += datanames[id];
+	if(id < 0) {
+	  dataname += "__ex" + to_string(-id-1);
+	}
+	else {
+	  dataname += datanames[id];
+	}
 	dataname += " ";
       }
       dataname = dataname.substr(0, dataname.size()-1);
@@ -290,7 +580,12 @@ void Dfg::gen_operands_node(node *p, bool fname) {
 	  dataname += typeopr(p->type);
 	  dataname += " ";
 	  for(auto id : sub) {
-	    dataname += datanames[id];
+	    if(id < 0) {
+	      dataname += "__ex" + to_string(-id-1);
+	    }
+	    else {
+	      dataname += datanames[id];
+	    }
 	    dataname += " ";
 	  }
 	  dataname = dataname.substr(0, dataname.size()-1);
@@ -355,7 +650,12 @@ void Dfg::gen_operands_node(node *p, bool fname) {
 				     dataname += typeopr(p->type);
 				     dataname += " ";
 				     for(auto id : sub) {
-				       dataname += datanames[id];
+				       if(id < 0) {
+					 dataname += "__ex" + to_string(-id-1);
+				       }
+				       else {
+					 dataname += datanames[id];
+				       }
 				       dataname += " ";
 				     }
 				     dataname = dataname.substr(0, dataname.size()-1);
@@ -386,13 +686,27 @@ void Dfg::gen_operands(bool fmultiopr, bool fname) {
   fmulti = 0;
   operands.clear();
   operands.resize(ndata);
+  exconds.clear();
+  exconds.resize(ndata);
   if(fmultiopr) {
     support_multiopr();
   }
   for(int i = 0; i < ndata; i++) {
     for(auto &v : operands_[i]) {
       set<int> s(v.begin(), v.end());
-      operands[i].insert(s);
+      map<int, bool> m;
+      operands[i].push_back(s);
+      exconds[i].push_back(m);
+    }
+    set<pair<set<int>, map<int, bool> > > s;
+    for(int j = 0; j < (int)operands[i].size(); j++) {
+      s.insert(make_pair(operands[i][j], exconds[i][j]));
+    }
+    operands[i].clear();
+    exconds[i].clear();
+    for(auto e: s) {
+      operands[i].push_back(e.first);
+      exconds[i].push_back(e.second);
     }
     if(!fmulti && operands[i].size() > 1) {
       fmulti = 1;
@@ -400,62 +714,122 @@ void Dfg::gen_operands(bool fmultiopr, bool fname) {
   }
 }
 
-bool Dfg::support_multiopr_rec(int id, node *ope, vector<set<int> > &vs) {
+bool Dfg::support_multiopr_rec(int id, node *ope, vector<set<int> > &vs, vector<map<int, bool> > &vm) {
   if(ope == NULL) {
     for(auto &s : vs) {
       s.insert(id);
     }
     return 1;
   }
-  if(dependents[id] || oprtypes[id] != ope->type) {
+  if(id >= 0 && (dependents[id] || oprtypes[id] != ope->type)) {
     return 0;
   }
-  set<set<int> > ss;
-  for(auto &v : operands_[id]) {
-    if(fcommutative(ope->type) && !ope->id) {
-      foreach_perm(oprs[ope->type]->n, [&](int *indices) {
-			 vector<set<int> > vs2(1);
-			 for(int i = 0; i < oprs[ope->type]->n; i++) {
-			   bool r = support_multiopr_rec(v[indices[i]], ope->vc[i], vs2);
-			   if(!r) {
-			     return;
-			   }
-			 }
-			 ss.insert(vs2.begin(), vs2.end());
-		       });
+  vector<set<int> > vs_;
+  vector<map<int, bool> > vm_;
+  if(id < 0) {
+    id = -id - 1;
+    int exid = exs.size() - 1;
+    for(int i = 0; i < (int)exs.size(); i++) {
+      if(std::get<1>(exs[i]) > id) {
+	exid = i - 1;
+	break;
+      }
     }
-    else {
+    auto &ex = exs[exid];
+    int ind = id - std::get<1>(ex);
+    int nc = std::get<3>(ex).size();
+    for(int ii = 0; ii < nc; ii++) {
       vector<set<int> > vs2(1);
-      bool r = 0;
-      for(int i = 0; i < oprs[ope->type]->n; i++) {
-	r = support_multiopr_rec(v[i], ope->vc[i], vs2);
-	if(!r) {
-	  break;
+      vector<map<int, bool> > vm2(1);
+      int s = std::get<2>(ex);
+      if(std::get<0>(ex)) {
+	for(int ii_ = 0; ii_ < nc; ii_++) {
+	  vm2[0][s + ind * nc + ii_] = ii == ii_;
+	}
+	for(int i = 0; i < nc; i++) {
+	  vm2[0][s + i * nc + ii] = i == ind;
 	}
       }
+      else {
+	for(int ii_ = 0; ii_ < nc; ii_++) {
+	  vm2[0][s + ii_] = ii_ == (ii - ind + nc) % nc;
+	}
+      }
+      bool r = support_multiopr_rec(std::get<3>(ex)[ii], ope, vs2, vm2);
       if(!r) {
 	continue;
       }
-      ss.insert(vs2.begin(), vs2.end());
+      for(int i = 0; i < (int)vs2.size(); i++) {
+	vs_.push_back(vs2[i]);
+	vm_.push_back(vm2[i]);
+      }
     }
   }
-  if(ss.empty()) {
+  else {
+    for(auto &v : operands_[id]) {
+      if(fcommutative(ope->type) && !ope->id) {
+	foreach_perm(oprs[ope->type]->n, [&](int *indices) {
+	  vector<set<int> > vs2(1);
+	  vector<map<int, bool> > vm2(1);
+	  for(int i = 0; i < oprs[ope->type]->n; i++) {
+	    bool r = support_multiopr_rec(v[indices[i]], ope->vc[i], vs2, vm2);
+	    if(!r) {
+	      return;
+	    }
+	  }
+	  for(int i = 0; i < (int)vs2.size(); i++) {
+	    vs_.push_back(vs2[i]);
+	    vm_.push_back(vm2[i]);
+	  }
+	});
+      }
+      else {
+	vector<set<int> > vs2(1);
+	vector<map<int, bool> > vm2(1);
+	bool r = 0;
+	for(int i = 0; i < oprs[ope->type]->n; i++) {
+	  r = support_multiopr_rec(v[i], ope->vc[i], vs2, vm);
+	  if(!r) {
+	    break;
+	  }
+	}
+	if(!r) {
+	  continue;
+	}
+	for(int i = 0; i < (int)vs2.size(); i++) {
+	  vs_.push_back(vs2[i]);
+	  vm_.push_back(vm2[i]);
+	}
+      }
+    }
+  }
+  vector<set<int> > vsnew;
+  vector<map<int, bool> > vmnew;
+  for(int i = 0; i < (int)vs.size(); i++) {
+    for(int j = 0; j < (int)vs_.size(); j++) {
+      map<int, bool> m = vm[i];
+      bool f = 0;
+      for(auto e: vm_[j]) {
+	if(m.count(e.first) && m[e.first] != e.second) {
+	  f = 1;
+	  break;
+	}
+	m[e.first] = e.second;
+      }
+      if(f) {
+	continue;
+      }
+      set<int> s = vs[i];
+      s.insert(vs_[j].begin(), vs_[j].end());
+      vsnew.push_back(s);
+      vmnew.push_back(m);
+    }
+  }
+  if(vsnew.empty()) {
     return 0;
   }
-  if(ss.size() == 1) {
-    for(auto &s : vs) {
-      s.insert(ss.begin()->begin(), ss.begin()->end());
-    }
-    return 1;
-  }
-  vector<set<int> > vs_ = vs;
-  vs.clear();
-  for(auto &s2 : ss) {
-    for(auto s : vs_) {
-      s.insert(s2.begin(), s2.end());
-      vs.push_back(s);
-    }
-  }
+  vs = vsnew;
+  vm = vmnew;
   return 1;
 }
 
@@ -463,12 +837,16 @@ void Dfg::support_multiopr() {
   for(auto multiopr : multioprs) {
     for(int i = 0; i < ndata; i++) { 
       vector<set<int> > vs(1);
+      vector<map<int, bool> > vm(1);
       bool tmp = dependents[i];
       dependents[i] = 0;
-      bool r = support_multiopr_rec(i, multiopr, vs);
+      bool r = support_multiopr_rec(i, multiopr, vs, vm);
       dependents[i] = tmp;
       if(r) {
-	operands[i].insert(vs.begin(), vs.end());
+	for(int j = 0; j < (int)vs.size(); j++) {
+	  operands[i].push_back(vs[j]);
+	  exconds[i].push_back(vm[j]);
+	}
       }
     }
   }
@@ -655,8 +1033,8 @@ void Dfg::read(string filename) {
   f.close();
 }
 
-std::vector<std::tuple<int, int, bool> > Dfg::get_priority() {
-  std::vector<std::tuple<int, int, bool> > v;
+vector<tuple<int, int, bool> > Dfg::get_priority() {
+  vector<tuple<int, int, bool> > v;
   for(auto &t : priority) {
     v.push_back(make_tuple((get<0>(t))->id, (get<1>(t))->id, get<2>(t)));
   }
@@ -667,12 +1045,46 @@ void Dfg::print_operands() {
   for(int i = ninputs; i < ndata; i++) {
     auto &a = operands[i];
     cout << i << " :" << endl;
-    for(auto &b : a) {
+    for(int j = 0; j < (int)a.size(); j++) {
+      auto &b = a[j];
       cout << "\t";
       for(auto c : b) {
 	cout << setw(3) << c << ", ";
       }
+      auto &d = exconds[i][j];
+      if(!d.empty()) {
+	cout << "\t(";
+	for(auto c : d) {
+	  if(c.second) {
+	    cout << setw(3) << c.first << ", ";
+	  }
+	}
+	cout << ")";
+      }
       cout << endl;
+    }
+  }
+}
+
+void Dfg::update_datanames(map<int, int> &exmap) {
+  for(int i = 0; i < ndata; i++) {
+    if(datanames[i].empty()) {
+      continue;  
+    }
+    vector<string> vs;
+    {
+      stringstream ss;
+      string s;
+      ss.str(datanames[i]);
+      while(getline(ss, s, ' ')) {
+	if(s.size() > 4 && s.substr(0, 4) == "__ex") {
+	  vs.push_back(s);
+	}
+      }
+    }
+    for(string s: vs) {
+      int exid = str2int(s.substr(4));
+      datanames[i].replace(datanames[i].find(s), s.size(), datanames[exmap[exid]]);
     }
   }
 }

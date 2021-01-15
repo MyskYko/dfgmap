@@ -12,12 +12,19 @@ public:
   int get_ndata() { return ndata; }
   bool get_fmulti() { return fmulti; }
   std::string get_dataname(int i) { return datanames[i]; }
-  std::vector<std::set<std::set<int> > > get_operands() { return operands; }
+  std::vector<std::vector<std::set<int> > > get_operands() { return operands; }
   std::vector<std::tuple<int, int, bool> > get_priority();
+  int get_nexs() { return nexs; }
+  int get_nsels() { return nsels; }
+  std::vector<std::tuple<bool, int, int, std::vector<int> > > get_exs() { return exs; }
+  std::vector<std::vector<std::map<int, bool> > > get_exconds() { return exconds; }
   
   void read(std::string filename);
   void compress();
+  void insert_xbtree();
   void gen_operands(bool fmultiopr, bool fname);
+
+  void update_datanames(std::map<int, int> &exmap);
   
   int input_id(std::string name);
   std::set<int> output_ids();
@@ -33,6 +40,7 @@ private:
     std::vector<struct node_ *> vc;
     int id;
     bool dependent = false;
+    std::vector<int> exind;
   } node;
   
   typedef struct opr_ {
@@ -43,9 +51,11 @@ private:
 
   int ninputs = 0;
   int ndata;
+  int nexs = 0;
+  int nsels = 0;
   bool fmulti = 0;
   std::vector<std::string> datanames;
-  std::vector<std::set<std::set<int> > > operands;
+  std::vector<std::vector<std::set<int> > > operands;
   std::vector<node *> nodes;
   std::vector<std::string> outputnames;
   std::vector<opr *> oprs;
@@ -56,6 +66,8 @@ private:
   std::vector<bool> dependents;
   std::map<std::pair<int, std::vector<int> >, int> unique;
   std::vector<std::tuple<node *, node *, bool> > priority;
+  std::vector<std::tuple<bool, int, int, std::vector<int> > > exs;
+  std::vector<std::vector<std::map<int, bool> > > exconds;
   
   int oprtype(std::string s);
   std::string typeopr(int i);
@@ -70,11 +82,12 @@ private:
   void create_node(std::vector<std::string> &vs);
   
   void compress_node(node * p);
-  bool support_multiopr_rec(int id, node *ope, std::vector<std::set<int> > &vs);
+  void insert_xbtree_node(node * p);
+  bool support_multiopr_rec(int id, node *ope, std::vector<std::set<int> > &vs, std::vector<std::map<int, bool> > &vm);
   void support_multiopr();
   void gen_operands_node(node * p, bool fname);
   
-  void print_node(node * p, int depth);
+  void print_node(node * p, int depth, int exind);
 };
 
 #endif // DFG_HPP

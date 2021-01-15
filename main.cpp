@@ -40,6 +40,7 @@ int main(int argc, char** argv) {
   
   bool fextmem = 0;
   bool ftransform = 0;
+  bool fxbtree = 0;
   bool fmultiopr = 1;
 
   bool filp = 0;
@@ -135,6 +136,9 @@ int main(int argc, char** argv) {
       case 'c':
 	ftransform ^= 1;
 	break;
+      case 'b':
+	fxbtree ^= 1;
+	break;
       case 'm':
 	fmultiopr ^= 1;
 	break;
@@ -221,6 +225,7 @@ int main(int argc, char** argv) {
 	cout << "\t-t <int> : the number of contexts for pipeline (0 means no pipelining) [default = " << ncontexts << "]" << endl;
 	cout << "\t-x       : toggle enabling external memory to store intermediate values [default = " << fextmem << "]" << endl;
 	cout << "\t-c       : toggle transforming dataflow [default = " << ftransform << "]" << endl;
+	cout << "\t-b       : toggle using xbtree for transfomration [default = " << fxbtree << "]" << endl;
 	cout << "\t-m       : toggle using given multi-operator operations [default = " << fmultiopr << "]" << endl;
 	cout << "\t-i       : toggle using ILP solver instead of SAT solver [default = " << filp << "]" << endl;
 	cout << "\t-y       : toggle post processing to remove redundancy [default = " << freduce << "]" << endl;
@@ -274,6 +279,13 @@ int main(int argc, char** argv) {
       cout << "### data-flow after compression ###" << endl;
       dfg.print();
     }
+    if(fxbtree) {
+      dfg.insert_xbtree();
+      if(nverbose >= 2) {
+	cout << "### data-flow after xbtree insertion ###" << endl;
+	dfg.print();
+      }
+    }
   }
 
   // generate operand list
@@ -297,6 +309,12 @@ int main(int argc, char** argv) {
     cnf.fmulti = dfg.get_fmulti();
     cnf.filp = filp;
     cnf.priority = dfg.get_priority();
+    if(fxbtree) {
+      cnf.nexs = dfg.get_nexs();
+      cnf.nsels = dfg.get_nsels();
+      cnf.exs = dfg.get_exs();
+      cnf.exconds = dfg.get_exconds();
+    }
 
     // read option file
     ifstream f(gfilename);
@@ -595,6 +613,9 @@ int main(int argc, char** argv) {
   }
 
   cnf.gen_image(rfilename);
+  if(fxbtree) {
+    dfg.update_datanames(cnf.exmap);
+  }
 
   if(freduce) {
     cnf.reduce_image();
