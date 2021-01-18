@@ -29,7 +29,7 @@ Cnf::Cnf(set<int> pes, set<int> mems, vector<tuple<set<int>, set<int>, int> > co
 }
 
 void Cnf::write_clause(int &nclauses, vector<int> &vLits, ofstream &f) {
-  if(filp) {
+  if(nilp) {
     int c = 1;
     for(int lit : vLits) {
       if(lit < 0) {
@@ -132,7 +132,7 @@ void Cnf::cardinality_amo(int &nvars, int &nclauses, vector<int> &vLits, ofstrea
   if(vLits.size() <= 1) {
     return;
   }
-  if(filp) {
+  if(nilp) {
     int c = 1;
     for(int lit : vLits) {
       if(lit < 0) {
@@ -170,7 +170,7 @@ void Cnf::cardinality_amk(int &nvars, int &nclauses, vector<int> &vLits, ofstrea
   if((int)vLits.size() <= k) {
     return;
   }
-  if(filp) {
+  if(nilp) {
     int c = k;
     for(int lit : vLits) {
       if(lit < 0) {
@@ -350,13 +350,13 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
   ofstream f(filename);
   vector<int> vLits;
 
-  if(filp) {
+  if(nilp) {
     f << "minimize" << endl;
     f << "subject to" << endl;
   }
   
   // init condition
-  f << (filp? "\\": "c") << " init condition" << endl;
+  f << (nilp? "\\": "c") << " init condition" << endl;
   for(int j = 0; j < nnodes; j++) {
     for(int i = 0; i < ndata; i++) {
       vLits.clear();
@@ -374,7 +374,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
   }
 
   // final condition
-  f << (filp? "\\": "c") << " final condition" << endl;
+  f << (nilp? "\\": "c") << " final condition" << endl;
   for(int i : output_ids) {
     vLits.clear();
     vLits.push_back((ncycles-1)*nnodes*ndata + i + 1);
@@ -382,7 +382,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
   }
 
   // conditions for node
-  f << (filp? "\\": "c") << " conditions for node" << endl;
+  f << (nilp? "\\": "c") << " conditions for node" << endl;
   for(int k = 1; k < ncycles; k++) {
     for(int j = 0; j < nnodes; j++) {
       for(int i = 0; i < ndata; i++) {
@@ -401,7 +401,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
   }
 
   // conditions for communication
-  f << (filp? "\\": "c") << " conditions for communication" << endl;
+  f << (nilp? "\\": "c") << " conditions for communication" << endl;
   for(int k = 1; k < ncycles; k++) {
     for(int h = 0; h < ncoms; h++) {
       for(int i = 0; i < ndata; i++) {
@@ -421,7 +421,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
   }
 
   // conditions for operation
-  f << (filp? "\\": "c") << " conditions for operation" << endl;
+  f << (nilp? "\\": "c") << " conditions for operation" << endl;
   for(int k = 1; k < ncycles; k++) {
     for(int j : pes) {
       for(int i = 0; i < ndata; i++) {
@@ -571,7 +571,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
   }
 
   // at most 1 or K
-  f << (filp? "\\": "c") << " at most 1 or K" << endl;
+  f << (nilp? "\\": "c") << " at most 1 or K" << endl;
   if(ncontexts <= 0 || ncontexts > ncycles) {
     ncontexts = ncycles;
   }
@@ -740,7 +740,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 
   // option
   if(!fextmem) {
-    f << (filp? "\\": "c") << " not fextmem" << endl;
+    f << (nilp? "\\": "c") << " not fextmem" << endl;
     for(int k = 0; k < ncycles; k++) {
       for(int i = ninputs; i < ndata; i++) {
 	if(find(output_ids.begin(), output_ids.end(), i) == output_ids.end()) {
@@ -765,7 +765,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
     }
   }
   
-  if(filp) {
+  if(nilp) {
     f << "binary" << endl;
     for(int i = 0; i < nvars; i++) {
       f << "x" << i+1 << endl;
@@ -777,7 +777,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 
   nvars_ = nvars;
 
-  if(filp) {
+  if(nilp) {
     return;
   }
   
@@ -794,7 +794,7 @@ void Cnf::gen_image(string filename) {
   }
   string l;
   while(getline(f, l)) {
-    if(filp) {
+    if(nilp == 1) {
       string::size_type i = l.find("<");
       string::size_type j = l.find(">");
       if(i == string::npos || j == string::npos || i > j) {
@@ -839,6 +839,25 @@ void Cnf::gen_image(string filename) {
 	    show_error("unexpected line", l);
 	  }
 	}
+      }
+      continue;
+    }
+    if(nilp == 2) {
+      if(l.empty() || l[0] == '#') {
+	continue;
+      }
+      string sname, svalue;
+      stringstream ss(l);
+      try {
+	getline(ss, sname, ' ');
+	sname = sname.substr(1);
+	getline(ss, svalue, ' ');
+	if(str2int(svalue)) {
+	  results[str2int(sname)-1] = 1;
+	}
+      }
+      catch(...) {
+	show_error("unexpected line", l);
       }
       continue;
     }

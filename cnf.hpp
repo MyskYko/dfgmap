@@ -11,7 +11,7 @@ class Cnf {
 public:
   int nencode = 0;
   bool fmulti = 0;
-  bool filp = 0;
+  int nilp = 0;
   std::map<int, std::vector<int> > assignments;
   std::vector<std::tuple<int, std::set<int>, int> > amk_assignments;
   std::map<int, int> memsize;

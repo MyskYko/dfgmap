@@ -29,7 +29,8 @@ int main(int argc, char** argv) {
 				"lingeling " + pfilename + " | tee " + rfilename,
 				"plingeling " + pfilename + " | tee " + rfilename};
 
-  string solver_cmd_ilp = "cplex -c \"read " + pfilename_ilp + "\" \"set emphasis mip 1\" \"set threads 1\" \"optimize\" \"write " +  rfilename_ilp + "\"";
+  vector<string> solver_cmds_ilp = {"cplex -c \"read " + pfilename_ilp + "\" \"set emphasis mip 1\" \"set threads 1\" \"optimize\" \"write " +  rfilename_ilp + "\"",
+				   "gurobi_cl Threads=1 ResultFile=" + rfilename_ilp + " " + pfilename_ilp};
 
   string dot_cmd = "dot -T" + ifilename_type + " " + dfilename;
 
@@ -43,7 +44,7 @@ int main(int argc, char** argv) {
   bool fxbtree = 0;
   bool fmultiopr = 1;
 
-  bool filp = 0;
+  int nilp = 0;
   bool freduce = 1;
   bool finc = 0;
   string timeout = "1d";
@@ -143,7 +144,15 @@ int main(int argc, char** argv) {
 	fmultiopr ^= 1;
 	break;
       case 'i':
-	filp ^= 1;
+	try {
+	  nilp = str2int(argv[++i]);
+	}
+	catch(...) {
+	  show_error("-i must be followed by integer");
+	}
+	if(nilp < 1 || nilp > 2) {
+	  show_error("ILP solver must be 1 or 2");
+	}
 	break;
       case 'y':
 	freduce ^= 1;
@@ -227,7 +236,6 @@ int main(int argc, char** argv) {
 	cout << "\t-c       : toggle transforming dataflow [default = " << ftransform << "]" << endl;
 	cout << "\t-b       : toggle using xbtree for transfomration [default = " << fxbtree << "]" << endl;
 	cout << "\t-m       : toggle using given multi-operator operations [default = " << fmultiopr << "]" << endl;
-	cout << "\t-i       : toggle using ILP solver instead of SAT solver [default = " << filp << "]" << endl;
 	cout << "\t-y       : toggle post processing to remove redundancy [default = " << freduce << "]" << endl;
 	cout << "\t-a       : toggle doing incremental synthesis [default = " << finc << "]" << endl;
 	cout << "\t-z       : toggle naming intermadiate variables in the result [default = " << fname << "]" << endl;
@@ -243,6 +251,10 @@ int main(int argc, char** argv) {
 	cout << "\t           \t1 : glucose" << endl;
 	cout << "\t           \t2 : lingeling" << endl;
 	cout << "\t           \t3 : plingeling" << endl;
+	cout << "\t-i       : ILP solver [default = " << nilp << "]" << endl;
+	cout << "\t           \t0 : use SAT solver" << endl;
+	cout << "\t           \t1 : cplex" << endl;
+	cout << "\t           \t2 : gurobi" << endl;
 	cout << "\t-v <int> : the level of verbosing information [default = " << nverbose << "]" << endl;
 	cout << "\t           \t0 : minimum" << endl;
 	cout << "\t           \t1 : results" << endl;
@@ -307,7 +319,7 @@ int main(int argc, char** argv) {
   {
     cnf.nencode = nencode;
     cnf.fmulti = dfg.get_fmulti();
-    cnf.filp = filp;
+    cnf.nilp = nilp;
     cnf.priority = dfg.get_priority();
     if(fxbtree) {
       cnf.nexs = dfg.get_nexs();
@@ -517,10 +529,10 @@ int main(int argc, char** argv) {
     return 0;
   }
   string solver_cmd = solver_cmds[nsolver];
-  if(filp) {
+  if(nilp) {
     pfilename = pfilename_ilp;
     rfilename = rfilename_ilp;
-    solver_cmd = solver_cmd_ilp;
+    solver_cmd = solver_cmds_ilp[nilp-1];
   }
   double totaltime = 0;
 
@@ -553,8 +565,13 @@ int main(int argc, char** argv) {
     double dtime = chrono::duration_cast<std::chrono::milliseconds>(endtime-starttime).count();
     totaltime += dtime;
     ifstream f(rfilename);
-    if(filp) {
-      r = !f.fail();
+    if(nilp) {
+      if(f.fail()) {
+	r = 0;
+      }
+      else {
+	r = f.peek() != ifstream::traits_type::eof();
+      }
     }
     else {
       if(!f) {
