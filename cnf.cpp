@@ -555,7 +555,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	    break;
 	  }
 	}
-	// amo and alo for ii
+	// amo for ii
 	if(get<0>(ex)) {
 	  for(int ii = 0; ii < nc; ii++) {
 	    vLits.clear();
@@ -563,7 +563,6 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	      int s = get<2>(ex) + i * nc + ii;
 	      vLits.push_back(qhead + s + 1);
 	    }
-	    write_clause(nclauses, vLits, f);
 	    cardinality_amo(nvars, nclauses, vLits, f);
 	  }
 	}
