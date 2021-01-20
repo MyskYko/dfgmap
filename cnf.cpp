@@ -28,7 +28,7 @@ Cnf::Cnf(set<int> pes, set<int> mems, vector<tuple<set<int>, set<int>, int> > co
   }
 }
 
-void Cnf::write_clause(int &nclauses, vector<int> &vLits, ofstream &f) {
+void Cnf::write_clause(int &nclauses, vector<int> &vLits) {
   if(nilp) {
     int c = 1;
     for(int lit : vLits) {
@@ -42,6 +42,17 @@ void Cnf::write_clause(int &nclauses, vector<int> &vLits, ofstream &f) {
     f << ">= " << c << endl;
     return;
   }
+  if(S) {
+    Glucose::vec<Glucose::Lit> clause;
+    for(int lit : vLits) {
+      while(abs(lit) > S->nVars()) {
+	S->newVar();
+      }
+      clause.push(Glucose::mkLit(abs(lit) - 1, lit < 0));
+    }
+    S->addClause(clause);
+    return;
+  }
   for(int lit : vLits) {
     f << lit << " ";
   }
@@ -49,19 +60,19 @@ void Cnf::write_clause(int &nclauses, vector<int> &vLits, ofstream &f) {
   nclauses++;
 }
 
-void Cnf::amo_naive(int &nclauses, vector<int> &vLits, ofstream &f) {
+void Cnf::amo_naive(int &nclauses, vector<int> &vLits) {
   vector<int> vLits2;
   foreach_comb(vLits.size(), 2, [&](int *indices) {
 				  vLits2.clear();
 				  vLits2.push_back(-vLits[indices[0]]);
 				  vLits2.push_back(-vLits[indices[1]]);
-				  write_clause(nclauses, vLits2, f);
+				  write_clause(nclauses, vLits2);
 				});
 }
 
 
 
-void Cnf::amo_bimander(int &nvars, int &nclauses, vector<int> &vLits, ofstream &f, int nbim) {
+void Cnf::amo_bimander(int &nvars, int &nclauses, vector<int> &vLits, int nbim) {
   vector<int> vLits2;
   int m = vLits.size() / nbim + vLits.size() % nbim;
   int nb = integer_log2(m);
@@ -71,7 +82,7 @@ void Cnf::amo_bimander(int &nvars, int &nclauses, vector<int> &vLits, ofstream &
       vLits2.push_back(vLits[i*nbim + j]);
     }
     if(vLits2.size() > 1) {
-      amo_naive(nclauses, vLits2, f);
+      amo_naive(nclauses, vLits2);
     }
     for(int k = 0; k < nb; k++) {
       int b = 1 << k;
@@ -80,7 +91,7 @@ void Cnf::amo_bimander(int &nvars, int &nclauses, vector<int> &vLits, ofstream &
 	  vLits2.clear();
 	  vLits2.push_back(-vLits[i*nbim + j]);
 	  vLits2.push_back(nvars + k + 1);
-	  write_clause(nclauses, vLits2, f);
+	  write_clause(nclauses, vLits2);
 	}
       }
       else {
@@ -88,7 +99,7 @@ void Cnf::amo_bimander(int &nvars, int &nclauses, vector<int> &vLits, ofstream &
 	  vLits2.clear();
 	  vLits2.push_back(-vLits[i*nbim + j]);
 	  vLits2.push_back(-(nvars + k + 1));
-	  write_clause(nclauses, vLits2, f);
+	  write_clause(nclauses, vLits2);
 	}
       }
     }
@@ -96,7 +107,7 @@ void Cnf::amo_bimander(int &nvars, int &nclauses, vector<int> &vLits, ofstream &
   nvars += nb;
 }
 
-void Cnf::amo_commander(int &nvars, int &nclauses, vector<int> vLits, ofstream &f) {
+void Cnf::amo_commander(int &nvars, int &nclauses, vector<int> vLits) {
   vector<int> vLits2;
   while(vLits.size() > 1) {
     int k = 0;
@@ -105,20 +116,20 @@ void Cnf::amo_commander(int &nvars, int &nclauses, vector<int> vLits, ofstream &
       vLits2.clear();
       vLits2.push_back(-vLits[2*j]);
       vLits2.push_back(-vLits[2*j+1]);
-      write_clause(nclauses, vLits2, f);
+      write_clause(nclauses, vLits2);
       vLits2.clear();
       vLits2.push_back(-nvars);
       vLits2.push_back(vLits[2*j]);
       vLits2.push_back(vLits[2*j+1]);
-      write_clause(nclauses, vLits2, f);
+      write_clause(nclauses, vLits2);
       vLits2.clear();
       vLits2.push_back(nvars);
       vLits2.push_back(-vLits[2*j]);
-      write_clause(nclauses, vLits2, f);
+      write_clause(nclauses, vLits2);
       vLits2.clear();
       vLits2.push_back(nvars);
       vLits2.push_back(-vLits[2*j+1]);
-      write_clause(nclauses, vLits2, f);      
+      write_clause(nclauses, vLits2);      
       vLits[k++] = nvars;
     }
     if(vLits.size()%2) {
@@ -128,7 +139,7 @@ void Cnf::amo_commander(int &nvars, int &nclauses, vector<int> vLits, ofstream &
   }
 }
 
-void Cnf::cardinality_amo(int &nvars, int &nclauses, vector<int> &vLits, ofstream &f) {
+void Cnf::cardinality_amo(int &nvars, int &nclauses, vector<int> &vLits) {
   if(vLits.size() <= 1) {
     return;
   }
@@ -147,26 +158,26 @@ void Cnf::cardinality_amo(int &nvars, int &nclauses, vector<int> &vLits, ofstrea
   }
   switch(nencode) {
   case 0:
-    amo_naive(nclauses, vLits, f);
+    amo_naive(nclauses, vLits);
     break;
   case 1:
-    amo_commander(nvars, nclauses, vLits, f);
+    amo_commander(nvars, nclauses, vLits);
     break;
   case 2:
-    amo_bimander(nvars, nclauses, vLits, f, 1); // binary
+    amo_bimander(nvars, nclauses, vLits, 1); // binary
     break;
   case 3:
-    amo_bimander(nvars, nclauses, vLits, f, 2);
+    amo_bimander(nvars, nclauses, vLits, 2);
     break;
   case 4:
-    amo_bimander(nvars, nclauses, vLits, f, integer_root(vLits.size()));
+    amo_bimander(nvars, nclauses, vLits, integer_root(vLits.size()));
     break;
   default:
     show_error("the type of encoding is invalid");
   }
 }
 
-void Cnf::cardinality_amk(int &nvars, int &nclauses, vector<int> &vLits, ofstream &f, int k) {
+void Cnf::cardinality_amk(int &nvars, int &nclauses, vector<int> &vLits, int k) {
   if((int)vLits.size() <= k) {
     return;
   }
@@ -190,7 +201,7 @@ void Cnf::cardinality_amk(int &nvars, int &nclauses, vector<int> &vLits, ofstrea
   nvars++;
   vLits2.clear();
   vLits2.push_back(-nvars);
-  write_clause(nclauses, vLits2, f);
+  write_clause(nclauses, vLits2);
   for(int i = 1; i < k; i++) {
     vCounts.push_back(nvars);
   }
@@ -201,7 +212,7 @@ void Cnf::cardinality_amk(int &nvars, int &nclauses, vector<int> &vLits, ofstrea
     vLits2.clear();
     vLits2.push_back(-vCounts[k-1]);
     vLits2.push_back(-x);
-    write_clause(nclauses, vLits2, f);
+    write_clause(nclauses, vLits2);
     if(j == (int)vLits.size()-1) {
       break;
     }
@@ -212,31 +223,31 @@ void Cnf::cardinality_amk(int &nvars, int &nclauses, vector<int> &vLits, ofstrea
       vLits2.clear();
       vLits2.push_back(-a);
       vLits2.push_back(x);
-      write_clause(nclauses, vLits2, f);
+      write_clause(nclauses, vLits2);
       vLits2.clear();
       vLits2.push_back(-a);
       vLits2.push_back(vCounts[i-1]);
-      write_clause(nclauses, vLits2, f);
+      write_clause(nclauses, vLits2);
       vLits2.clear();
       vLits2.push_back(a);
       vLits2.push_back(-x);
       vLits2.push_back(-vCounts[i-1]);
-      write_clause(nclauses, vLits2, f);
+      write_clause(nclauses, vLits2);
       // compute OR of it and i of previous level
       nvars++;
       vLits2.clear();
       vLits2.push_back(-a);
       vLits2.push_back(nvars);
-      write_clause(nclauses, vLits2, f);
+      write_clause(nclauses, vLits2);
       vLits2.clear();
       vLits2.push_back(-vCounts[i]);
       vLits2.push_back(nvars);
-      write_clause(nclauses, vLits2, f);
+      write_clause(nclauses, vLits2);
       vLits2.clear();
       vLits2.push_back(-nvars);
       vLits2.push_back(a);
       vLits2.push_back(vCounts[i]);
-      write_clause(nclauses, vLits2, f);
+      write_clause(nclauses, vLits2);
       // keep it at l of this level
       vCounts[i] = nvars;
     }
@@ -245,16 +256,16 @@ void Cnf::cardinality_amk(int &nvars, int &nclauses, vector<int> &vLits, ofstrea
     vLits2.clear();
     vLits2.push_back(-x);
     vLits2.push_back(nvars);
-    write_clause(nclauses, vLits2, f);
+    write_clause(nclauses, vLits2);
     vLits2.clear();
     vLits2.push_back(-vCounts[0]);
     vLits2.push_back(nvars);
-    write_clause(nclauses, vLits2, f);
+    write_clause(nclauses, vLits2);
     vLits2.clear();
     vLits2.push_back(-nvars);
     vLits2.push_back(x);
     vLits2.push_back(vCounts[0]);
-    write_clause(nclauses, vLits2, f);
+    write_clause(nclauses, vLits2);
     // keep it at 0 of this level
     vCounts[0] = nvars;
   }
@@ -347,7 +358,13 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
   nvars += nsels;
   int nclauses = 0;
   
-  ofstream f(filename);
+  if(!nilp && S) {
+    f.setstate(ios_base::badbit);
+  }
+  else {
+    f.open(filename);
+  }
+
   vector<int> vLits;
 
   if(nilp) {
@@ -369,7 +386,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
       else {
 	vLits.push_back(-(j*ndata + i + 1));
       }
-      write_clause(nclauses, vLits, f);
+      write_clause(nclauses, vLits);
     }
   }
 
@@ -378,7 +395,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
   for(int i : output_ids) {
     vLits.clear();
     vLits.push_back((ncycles-1)*nnodes*ndata + i + 1);
-    write_clause(nclauses, vLits, f);
+    write_clause(nclauses, vLits);
   }
 
   // conditions for node
@@ -395,7 +412,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	  vLits.push_back(yhead + k*ncoms*ndata + h*ndata + i + 1);
 	}
 	vLits.push_back(zhead + k*nnodes*ndata + j*ndata + i + 1);
-	write_clause(nclauses, vLits, f);
+	write_clause(nclauses, vLits);
       }
     }
   }
@@ -415,7 +432,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	    vLits.push_back(yhead + k*ncoms*ndata + h2*ndata + i + 1);
 	  }
 	}
-	write_clause(nclauses, vLits, f);
+	write_clause(nclauses, vLits);
       }
     }
   }
@@ -442,7 +459,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 		  vLits.push_back(yhead + k*ncoms*ndata + h*ndata + d + 1);
 		}
 	      }
-	      write_clause(nclauses, vLits, f);
+	      write_clause(nclauses, vLits);
 	    }
 	    if(nexs) {
 	      auto &excond = exconds[i][si];
@@ -453,7 +470,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 		vLits.clear();
 		vLits.push_back(-nvars);
 		vLits.push_back(qhead + e.first + 1);
-		write_clause(nclauses, vLits, f);
+		write_clause(nclauses, vLits);
 	      }
 	    }
 	  }
@@ -462,7 +479,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	  for(int l = nvars_ + 1; l <= nvars; l++) {
 	    vLits.push_back(l);
 	  }
-	  write_clause(nclauses, vLits, f);
+	  write_clause(nclauses, vLits);
 	}
 	else {
 	  for(auto &s : operands[i]) {
@@ -481,13 +498,13 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 		  vLits.push_back(yhead + k*ncoms*ndata + h*ndata + d + 1);
 		}
 	      }
-	      write_clause(nclauses, vLits, f);
+	      write_clause(nclauses, vLits);
 	    }
 	  }
 	  if(operands[i].empty()) {
 	    vLits.clear();
 	    vLits.push_back(-(zhead + k*nnodes*ndata + j*ndata + i + 1));
-	    write_clause(nclauses, vLits, f);
+	    write_clause(nclauses, vLits);
 	  }
 	}
       }
@@ -496,7 +513,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
       for(int i = 0; i < ndata; i++) {
 	vLits.clear();
 	vLits.push_back(-(zhead + k*nnodes*ndata + j*ndata + i + 1));
-	write_clause(nclauses, vLits, f);
+	write_clause(nclauses, vLits);
       }
     }
   }
@@ -522,7 +539,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 		vLits.push_back(yhead + k*ncoms*ndata + h*ndata + d + 1);
 	      }
 	    }
-	    write_clause(nclauses, vLits, f);
+	    write_clause(nclauses, vLits);
 	    vLits.clear();
 	    vLits.push_back(-nvars);
 	    int s = get<2>(ex);
@@ -533,14 +550,14 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	      s += (ii - i + nc) % nc;
 	    }
 	    vLits.push_back(qhead + s + 1);
-	    write_clause(nclauses, vLits, f);
+	    write_clause(nclauses, vLits);
 	  }
 	  vLits.clear();
 	  vLits.push_back(-(phead + k*nnodes*nexs + j*nexs + i + get<1>(ex) + 1));
 	  for(int l = nvars_ + 1; l <= nvars; l++) {
 	    vLits.push_back(l);
 	  }
-	  write_clause(nclauses, vLits, f);
+	  write_clause(nclauses, vLits);
 	}
 	// amo and alo for i
 	for(int i = 0; i < nc; i++) {
@@ -549,8 +566,8 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	    int s = get<2>(ex) + i * nc + ii;
 	    vLits.push_back(qhead + s + 1);
 	  }
-	  write_clause(nclauses, vLits, f);
-	  cardinality_amo(nvars, nclauses, vLits, f);
+	  write_clause(nclauses, vLits);
+	  cardinality_amo(nvars, nclauses, vLits);
 	  if(!get<0>(ex)) {
 	    break;
 	  }
@@ -563,7 +580,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	      int s = get<2>(ex) + i * nc + ii;
 	      vLits.push_back(qhead + s + 1);
 	    }
-	    cardinality_amo(nvars, nclauses, vLits, f);
+	    cardinality_amo(nvars, nclauses, vLits);
 	  }
 	}
       }
@@ -586,10 +603,10 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	  }
 	}
 	if(nregs == 1) {
-	  cardinality_amo(nvars, nclauses, vLits, f);
+	  cardinality_amo(nvars, nclauses, vLits);
 	}
 	else {
-	  cardinality_amk(nvars, nclauses, vLits, f, nregs);
+	  cardinality_amk(nvars, nclauses, vLits, nregs);
 	}
       }
     }
@@ -606,10 +623,10 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	}
       }
       if(band == 1) {
-	cardinality_amo(nvars, nclauses, vLits, f);	
+	cardinality_amo(nvars, nclauses, vLits);	
       }
       else {
-	cardinality_amk(nvars, nclauses, vLits, f, band);
+	cardinality_amk(nvars, nclauses, vLits, band);
       }
     }
     // ope
@@ -622,10 +639,10 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	  }
 	}
 	if(nprocs == 1) {
-	  cardinality_amo(nvars, nclauses, vLits, f);
+	  cardinality_amo(nvars, nclauses, vLits);
 	}
 	else {
-	  cardinality_amk(nvars, nclauses, vLits, f, nprocs);
+	  cardinality_amk(nvars, nclauses, vLits, nprocs);
 	}
       }
     }
@@ -641,10 +658,10 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	}
       }
       if(j.second == 1) {
-	cardinality_amo(nvars, nclauses, vLits, f);
+	cardinality_amo(nvars, nclauses, vLits);
       }
       else {
-	cardinality_amk(nvars, nclauses, vLits, f, j.second);
+	cardinality_amk(nvars, nclauses, vLits, j.second);
       }
     }
     // nports
@@ -660,10 +677,10 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	  }
 	}
 	if(j.second.first == 1) {
-	  cardinality_amo(nvars, nclauses, vLits, f);
+	  cardinality_amo(nvars, nclauses, vLits);
 	}
 	else {
-	  cardinality_amk(nvars, nclauses, vLits, f, j.second.first);
+	  cardinality_amk(nvars, nclauses, vLits, j.second.first);
 	}
       }
       // going
@@ -677,10 +694,10 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	  }
 	}
 	if(j.second.second == 1) {
-	  cardinality_amo(nvars, nclauses, vLits, f);
+	  cardinality_amo(nvars, nclauses, vLits);
 	}
 	else {
-	  cardinality_amk(nvars, nclauses, vLits, f, j.second.second);
+	  cardinality_amk(nvars, nclauses, vLits, j.second.second);
 	}
       }
     }
@@ -695,10 +712,10 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
       vLits.push_back(get<0>(j)*ndata + i + 1);
     }
     if(get<2>(j) == 1) {
-      cardinality_amo(nvars, nclauses, vLits, f);
+      cardinality_amo(nvars, nclauses, vLits);
     }
     else {
-      cardinality_amk(nvars, nclauses, vLits, f, get<2>(j));
+      cardinality_amk(nvars, nclauses, vLits, get<2>(j));
     }
   }
 
@@ -717,7 +734,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	for(int j = 0; j < nnodes; j++) {
 	  vLits.push_back(k*nnodes*ndata + j*ndata + i + 1);
 	}
-	write_clause(nclauses, vLits, f);
+	write_clause(nclauses, vLits);
 	m[i].push_back(nvars);
       }
     }
@@ -732,7 +749,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	  for(int k = 0; k <= k0; k++) {
 	    vLits.push_back(m[i0][k]);
 	  }
-	  write_clause(nclauses, vLits, f);
+	  write_clause(nclauses, vLits);
 	}
       }
     }
@@ -747,18 +764,18 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 	  // do not have
 	  vLits.clear();
 	  vLits.push_back(-(k*nnodes*ndata + i + 1));
-	  write_clause(nclauses, vLits, f);
+	  write_clause(nclauses, vLits);
 	  // do not send
 	  for(int h : outcoms[0]) {
 	    vLits.clear();
 	    vLits.push_back(-(yhead + k*ncoms*ndata + h*ndata + i + 1));
-	    write_clause(nclauses, vLits, f);
+	    write_clause(nclauses, vLits);
 	  }
 	  // do not receive
 	  for(int h : incoms[0]) {
 	    vLits.clear();
 	    vLits.push_back(-(yhead + k*ncoms*ndata + h*ndata + i + 1));
-	    write_clause(nclauses, vLits, f);
+	    write_clause(nclauses, vLits);
 	  }
 	}
       }
@@ -777,7 +794,7 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 
   nvars_ = nvars;
 
-  if(nilp) {
+  if(nilp || S) {
     return;
   }
   
@@ -788,108 +805,117 @@ void Cnf::gen_cnf(int ncycles, int nregs, int nprocs, int fextmem, int ncontexts
 
 void Cnf::gen_image(string filename) {
   vector<bool> results(nvars_);
-  ifstream f(filename);
-  if(!f) {
-    show_error("cannot open result file", filename);
-  }
-  string l;
-  while(getline(f, l)) {
-    if(nilp == 1) {
-      string::size_type i = l.find("<");
-      string::size_type j = l.find(">");
-      if(i == string::npos || j == string::npos || i > j) {
-	continue;
+  if(!nilp && S) {
+    for(int i = 0; i < nvars_; i++) {
+      if(S->model[i] == l_True) {
+	results[i] = 1;
       }
-      l = l.substr(i+1, j-i-1);
-      if(l == "variables") {
-	while(getline(f, l)) {
-	  i = l.find("<");
-	  j = l.find(">");
-	  if(i == string::npos || j == string::npos || i > j) {
-	    continue;
-	  }
-	  l = l.substr(i+1, j-i-1);
-	  if(l == "/variables") {
-	    break;
-	  }
-	  string sname, svalue;
-	  string s;
-	  stringstream ss(l);
-	  try {
-	    while(getline(ss, s, ' ')) {
-	      if(s.find("=") == string::npos) {
-		continue;
-	      }
-	      stringstream ss2(s);
-	      getline(ss2, s, '=');
-	      if(s == "name") {
+    }
+  }
+  else {
+    ifstream f(filename);
+    if(!f) {
+      show_error("cannot open result file", filename);
+    }
+    string l;
+    while(getline(f, l)) {
+      if(nilp == 1) {
+	string::size_type i = l.find("<");
+	string::size_type j = l.find(">");
+	if(i == string::npos || j == string::npos || i > j) {
+	  continue;
+	}
+	l = l.substr(i+1, j-i-1);
+	if(l == "variables") {
+	  while(getline(f, l)) {
+	    i = l.find("<");
+	    j = l.find(">");
+	    if(i == string::npos || j == string::npos || i > j) {
+	      continue;
+	    }
+	    l = l.substr(i+1, j-i-1);
+	    if(l == "/variables") {
+	      break;
+	    }
+	    string sname, svalue;
+	    string s;
+	    stringstream ss(l);
+	    try {
+	      while(getline(ss, s, ' ')) {
+		if(s.find("=") == string::npos) {
+		  continue;
+		}
+		stringstream ss2(s);
 		getline(ss2, s, '=');
-		sname = s.substr(2, s.size()-3);
+		if(s == "name") {
+		  getline(ss2, s, '=');
+		  sname = s.substr(2, s.size()-3);
+		}
+		if(s == "value") {
+		  getline(ss2, s, '=');
+		  svalue = s.substr(1, s.size()-2);
+		}
 	      }
-	      if(s == "value") {
-		getline(ss2, s, '=');
-		svalue = s.substr(1, s.size()-2);
+	      if(str2int(svalue)) {
+		results[str2int(sname)-1] = 1;
 	      }
 	    }
-	    if(str2int(svalue)) {
-	      results[str2int(sname)-1] = 1;
+	    catch(...) {
+	      show_error("unexpected line", l);
+	    }
+	  }
+	}
+	continue;
+      }
+      if(nilp == 2) {
+	if(l.empty() || l[0] == '#') {
+	  continue;
+	}
+	string sname, svalue;
+	stringstream ss(l);
+	try {
+	  getline(ss, sname, ' ');
+	  sname = sname.substr(1);
+	  getline(ss, svalue, ' ');
+	  if(str2int(svalue)) {
+	    results[str2int(sname)-1] = 1;
+	  }
+	}
+	catch(...) {
+	  show_error("unexpected line", l);
+	}
+	continue;
+      }
+      string s;
+      stringstream ss(l);
+      getline(ss, s, ' ');
+      if(s == "1" || s == "-1") {
+	if(s == "1") {
+	  results[0] = 1;
+	}
+	while(getline(ss, s, ' ')) {
+	  try {
+	    int i = str2int(s);
+	    if(i > 0) {
+	      results[i-1] = 1;
 	    }
 	  }
 	  catch(...) {
-	    show_error("unexpected line", l);
+	    show_error("unexpected word", s);
 	  }
 	}
       }
-      continue;
-    }
-    if(nilp == 2) {
-      if(l.empty() || l[0] == '#') {
-	continue;
-      }
-      string sname, svalue;
-      stringstream ss(l);
-      try {
-	getline(ss, sname, ' ');
-	sname = sname.substr(1);
-	getline(ss, svalue, ' ');
-	if(str2int(svalue)) {
-	  results[str2int(sname)-1] = 1;
-	}
-      }
-      catch(...) {
-	show_error("unexpected line", l);
-      }
-      continue;
-    }
-    string s;
-    stringstream ss(l);
-    getline(ss, s, ' ');
-    if(s == "1" || s == "-1") {
-      if(s == "1") {
-	results[0] = 1;
-      }
-      while(getline(ss, s, ' ')) {
-	try {
-	  int i = str2int(s);
-	  if(i > 0) {
-	    results[i-1] = 1;
+      else if(s == "v") {
+	while(getline(ss, s, ' ')) {
+	  try {
+	    int i = str2int(s);
+	    if(i > 0) {
+	      results[i-1] = 1;
+	    }
 	  }
-	}
-	catch(...) {
-	  show_error("unexpected word", s);
-	}
-      }
-    }
-    else if(s == "v") {
-      while(getline(ss, s, ' ')) {
-	try {
-	  int i = str2int(s);
-	  if(i > 0) {
-	    results[i-1] = 1;
+	  catch(...) {
+	    show_error("unexpected word", s);
 	  }
-	}
-	catch(...) {
-	  show_error("unexpected word", s);
 	}
       }
     }
@@ -1232,3 +1258,60 @@ void Cnf::reduce_image() {
   }
 }
 
+void Cnf::setup_glucose(bool fincr) {
+  if(S) {
+    delete S;
+  }
+  S = new Glucose::SimpSolver;
+  if(fincr) {
+    S->setIncrementalMode();
+    S->use_elim = 0;
+  }
+}
+
+void Cnf::run_glucose_opt() {
+  Glucose::vec<Glucose::Lit> clause;
+  
+  for(int j : pes) {
+    clause.clear();
+    for(int k = 0; k < ncycles_; k++) {
+      for(int i = 0; i < ndata; i++) {
+	clause.push(Glucose::mkLit(k*nnodes*ndata + j*ndata + i, true));
+      }
+    }
+    int r = S->solve(clause);
+    if(r) {
+      cout << "elim node " << j << endl;
+      for(int i = 0; i < clause.size(); i++) {
+	S->addClause(clause[i]);
+      }
+    }
+    S->solve();
+  }
+  
+  for(int h = 0; h < ncoms; h++) {
+    clause.clear();
+    for(int k = 0; k < ncycles_; k++) {
+      for(int i = 0; i < ndata; i++) {
+	clause.push(Glucose::mkLit(yhead + k*ncoms*ndata + h*ndata + i, true));
+      }
+    }
+    int r = S->solve(clause);
+    if(r) {
+      cout << "elim com ";
+      for(int j : get<0>(coms[h])) {
+	cout << j << " ";
+      }
+      cout << "-> ";
+      for(int j : get<1>(coms[h])) {
+	  cout << j << " ";
+      }
+      cout << endl;
+      
+      for(int i = 0; i < clause.size(); i++) {
+	S->addClause(clause[i]);
+      }
+    }
+    S->solve();
+  }
+}

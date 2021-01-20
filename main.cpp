@@ -27,7 +27,8 @@ int main(int argc, char** argv) {
   vector<string> solver_cmds = {"minisat " + pfilename + " " + rfilename,
 				"glucose " + pfilename + " " + rfilename,
 				"lingeling " + pfilename + " | tee " + rfilename,
-				"plingeling " + pfilename + " | tee " + rfilename};
+				"plingeling " + pfilename + " | tee " + rfilename,
+				""};
 
   vector<string> solver_cmds_ilp = {"cplex -c \"read " + pfilename_ilp + "\" \"set emphasis mip 1\" \"set threads 1\" \"optimize\" \"write " +  rfilename_ilp + "\"",
 				   "gurobi_cl Threads=1 ResultFile=" + rfilename_ilp + " " + pfilename_ilp};
@@ -49,11 +50,12 @@ int main(int argc, char** argv) {
   bool finc = 0;
   string timeout = "1d";
   
-  int nsolver = 0;
+  int nsolver = 4;
   int nencode = 3;
   
   int nverbose = 0;
   bool fname = 1;
+  bool fopt = 0;
 
   // read command
   for(int i = 1; i < argc; i++) {
@@ -163,6 +165,9 @@ int main(int argc, char** argv) {
       case 'z':
 	fname ^= 1;
 	break;
+      case 'q':
+	fopt ^= 1;
+	break;
       case 'l':
 	try {
 	  if(i+1 >= argc) {
@@ -230,15 +235,16 @@ int main(int argc, char** argv) {
 	cout << "\t-g <str> : the name of file for synthesis option (ignored if not exist) [default = \"" << gfilename << "\"]" << endl;
 	cout << "\t-n <int> : the number of cycles [default = " << ncycles << "]" << endl;
 	cout << "\t-r <int> : the number of registers in each PE (0 means no limit) [default = " << nregs << "]" << endl;
-	cout << "\t-u <int> : the number of processors in each PE (0 means no limit) [default = " << nprocs << "]" << endl;
+	cout << "\t-p <int> : the number of processors in each PE (0 means no limit) [default = " << nprocs << "]" << endl;
 	cout << "\t-t <int> : the number of contexts for pipeline (0 means no pipelining) [default = " << ncontexts << "]" << endl;
 	cout << "\t-x       : toggle enabling external memory to store intermediate values [default = " << fextmem << "]" << endl;
 	cout << "\t-c       : toggle transforming dataflow [default = " << ftransform << "]" << endl;
 	cout << "\t-b       : toggle using xbtree for transfomration [default = " << fxbtree << "]" << endl;
 	cout << "\t-m       : toggle using given multi-operator operations [default = " << fmultiopr << "]" << endl;
 	cout << "\t-y       : toggle post processing to remove redundancy [default = " << freduce << "]" << endl;
-	cout << "\t-a       : toggle doing incremental synthesis [default = " << finc << "]" << endl;
+	cout << "\t-a       : toggle increasing cycles when synthesis fails [default = " << finc << "]" << endl;
 	cout << "\t-z       : toggle naming intermadiate variables in the result [default = " << fname << "]" << endl;
+	cout << "\t-q       : toggle optimizing array processor (must use internal glucose) [default = " << fopt << "]" << endl;
 	cout << "\t-l <str> : the duration of timeout for each problem (0 means no time limit) [default = " << timeout << "]" << endl;
 	cout << "\t-d <int> : the type of at most one encoding [default = " << nencode << "]" << endl;
 	cout << "\t           \t0 : naive" << endl;
@@ -251,6 +257,7 @@ int main(int argc, char** argv) {
 	cout << "\t           \t1 : glucose" << endl;
 	cout << "\t           \t2 : lingeling" << endl;
 	cout << "\t           \t3 : plingeling" << endl;
+	cout << "\t           \t4 : internal glucose" << endl;
 	cout << "\t-i       : ILP solver [default = " << nilp << "]" << endl;
 	cout << "\t           \t0 : use SAT solver" << endl;
 	cout << "\t           \t1 : cplex" << endl;
@@ -265,6 +272,10 @@ int main(int argc, char** argv) {
 	show_error("invalid option", argv[i]);
       }
     }
+  }
+
+  if(fopt && nsolver != 4) {
+    show_error("-q must use internal glucose");
   }
 
   // read array processor file
@@ -533,6 +544,8 @@ int main(int argc, char** argv) {
     pfilename = pfilename_ilp;
     rfilename = rfilename_ilp;
     solver_cmd = solver_cmds_ilp[nilp-1];
+  } else if(solver_cmd.empty()) {
+    cnf.setup_glucose(fopt);
   }
   double totaltime = 0;
 
@@ -542,72 +555,87 @@ int main(int argc, char** argv) {
     cout << "ncycles : " << ncycles << endl;
     cout << "ndata : " << dfg.get_ndata() << endl;
     cnf.gen_cnf(ncycles, nregs, nprocs, fextmem, ncontexts, pfilename);
-    string cmd;
-    if(timeout != "0") {
-      cmd = "timeout " + timeout + " ";
-    }
-    cmd += solver_cmd;
-    if(nverbose < 3) {
-      cmd += " > /dev/null 2>&1";
-    }
-    remove(rfilename.c_str());
-    auto starttime = chrono::system_clock::now();
-    int r = system(cmd.c_str());
-    auto endtime = chrono::system_clock::now();
-    r = r >> 8;
-    if(r == 124) {
-      cout << "Timeout" << endl;
-      return 0;
-    }
-    if(r > 124) {
-      show_error("solver command", cmd);
-    }
-    double dtime = chrono::duration_cast<std::chrono::milliseconds>(endtime-starttime).count();
-    totaltime += dtime;
-    ifstream f(rfilename);
-    if(nilp) {
-      if(f.fail()) {
-	r = 0;
-      }
-      else {
-	r = f.peek() != ifstream::traits_type::eof();
+    int r;
+    double dtime;
+    if(solver_cmd.empty()) {
+      auto starttime = chrono::system_clock::now();
+      r = cnf.run_glucose();
+      auto endtime = chrono::system_clock::now();
+      dtime = chrono::duration_cast<std::chrono::milliseconds>(endtime-starttime).count();
+      if(!r) {
+	cnf.setup_glucose(fopt);
       }
     }
     else {
-      if(!f) {
-	show_error("cannot open result file", rfilename);
+      string cmd;
+      if(timeout != "0") {
+	cmd = "timeout " + timeout + " ";
       }
-      string l;
-      r = -1;
-      while(getline(f, l)) {
-	string s;
-	stringstream ss(l);
-	getline(ss, s, ' ');
-	if(s == "SAT" || s == "1" || s == "-1") {
-	  r = 1;
-	  break;
-	}
-	else if(s == "UNSAT") {
+      cmd += solver_cmd;
+      if(nverbose < 3) {
+	cmd += " > /dev/null 2>&1";
+      }
+      remove(rfilename.c_str());
+      auto starttime = chrono::system_clock::now();
+      r = system(cmd.c_str());
+      auto endtime = chrono::system_clock::now();
+      dtime = chrono::duration_cast<std::chrono::milliseconds>(endtime-starttime).count();
+      r = r >> 8;
+      if(r == 124) {
+	cout << "Timeout" << endl;
+	return 0;
+      }
+      if(r > 124) {
+	show_error("solver command", cmd);
+      }
+    }
+    totaltime += dtime;
+    if(!solver_cmd.empty()) {
+      ifstream f(rfilename);
+      if(nilp) {
+	if(f.fail()) {
 	  r = 0;
-	  break;
 	}
-	else if(s == "s") {
+	else {
+	  r = f.peek() != ifstream::traits_type::eof();
+	}
+      }
+      else {
+	if(!f) {
+	  show_error("cannot open result file", rfilename);
+	}
+	string l;
+	r = -1;
+	while(getline(f, l)) {
+	  string s;
+	  stringstream ss(l);
 	  getline(ss, s, ' ');
-	  if(s == "SATISFIABLE") {
+	  if(s == "SAT" || s == "1" || s == "-1") {
 	    r = 1;
 	    break;
 	  }
-	  else if(s == "UNSATISFIABLE") {
+	  else if(s == "UNSAT") {
 	    r = 0;
 	    break;
 	  }
+	  else if(s == "s") {
+	    getline(ss, s, ' ');
+	    if(s == "SATISFIABLE") {
+	      r = 1;
+	      break;
+	    }
+	    else if(s == "UNSATISFIABLE") {
+	      r = 0;
+	      break;
+	    }
+	  }
+	}
+	if(r == -1) {
+	  show_error("malformed result", rfilename);
 	}
       }
-      if(r == -1) {
-	show_error("malformed result", rfilename);
-      }
+      f.close();
     }
-    f.close();
     
     // show results
     if(r) {
@@ -627,6 +655,15 @@ int main(int argc, char** argv) {
 
   if(finc) {
     cout << endl << "time : " << totaltime << "ms in total" << endl;
+  }
+
+  if(fopt) {
+    cout << "### optimization ###" << endl;
+    auto starttime = chrono::system_clock::now();    
+    cnf.run_glucose_opt();
+    auto endtime = chrono::system_clock::now();
+    double dtime = chrono::duration_cast<std::chrono::milliseconds>(endtime-starttime).count();
+    cout << endl << "time : " << dtime << "ms in total" << endl;
   }
 
   cnf.gen_image(rfilename);

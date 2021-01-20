@@ -7,6 +7,8 @@
 #include <tuple>
 #include <map>
 
+#include <simp/SimpSolver.h>
+
 class Cnf {
 public:
   int nencode = 0;
@@ -36,6 +38,16 @@ public:
 
   void reduce_image();
 
+  void setup_glucose(bool fincr);
+  int run_glucose() { return S->solve(); }
+  void run_glucose_opt();
+
+  ~Cnf() {
+    if(S) {
+      delete S;
+    }
+  }
+
 private:
   int nnodes;
   int ndata;
@@ -52,6 +64,9 @@ private:
   std::vector<std::set<int> > incoms;
 
   std::map<int, std::set<int> > bypass;
+
+  std::ofstream f;
+  Glucose::SimpSolver *S = NULL;
   
   int ncycles_;
   int nvars_;
@@ -61,11 +76,11 @@ private:
   int phead;
   int qhead;
 
-  void write_clause(int &nclauses, std::vector<int> &vLits, std::ofstream &f);
-  void amo_naive(int &nclauses, std::vector<int> &vLits, std::ofstream &f);
-  void amo_bimander(int &nvars, int &nclauses, std::vector<int> &vLits, std::ofstream &f, int nbim);
-  void amo_commander(int &nvars, int &nclauses, std::vector<int> vLits, std::ofstream &f);
-  void cardinality_amo(int &nvars, int &nclauses, std::vector<int> &vLits, std::ofstream &f);
-  void cardinality_amk(int &nvars, int &nclauses, std::vector<int> &vLits, std::ofstream &f, int k);
+  void write_clause(int &nclauses, std::vector<int> &vLits);
+  void amo_naive(int &nclauses, std::vector<int> &vLits);
+  void amo_bimander(int &nvars, int &nclauses, std::vector<int> &vLits, int nbim);
+  void amo_commander(int &nvars, int &nclauses, std::vector<int> vLits);
+  void cardinality_amo(int &nvars, int &nclauses, std::vector<int> &vLits);
+  void cardinality_amk(int &nvars, int &nclauses, std::vector<int> &vLits, int k);
 };
 #endif // CNF_HPP
