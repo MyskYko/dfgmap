@@ -1,6 +1,4 @@
-#include <fstream>
 #include <sstream>
-#include <cstdlib>
 
 #include "global.hpp"
 #include "cnf.hpp"
@@ -849,11 +847,19 @@ void Cnf::gen_image(string filename) {
 		getline(ss2, s, '=');
 		if(s == "name") {
 		  getline(ss2, s, '=');
-		  sname = s.substr(2, s.size()-3);
+		  ss2.clear();
+		  ss2.str(s);
+		  getline(ss2, s, '\"');
+		  getline(ss2, s, '\"');
+		  sname = s.substr(1, s.size()-1);
 		}
 		if(s == "value") {
 		  getline(ss2, s, '=');
-		  svalue = s.substr(1, s.size()-2);
+		  ss2.clear();
+		  ss2.str(s);
+		  getline(ss2, s, '\"');
+		  getline(ss2, s, '\"');
+		  svalue = s;
 		}
 	      }
 	      if(str2int(svalue)) {

@@ -1,6 +1,4 @@
-#include <fstream>
 #include <sstream>
-#include <cstdio>
 #include <chrono>
 
 #include "global.hpp"
@@ -324,7 +322,7 @@ int main(int argc, char** argv) {
       show_error("unknown type", type);
     }
   }
-  Cnf cnf = Cnf(graph.get_nodes("pe"), graph.get_nodes("mem"), graph.get_edges("com"), dfg.get_ninputs(), dfg.output_ids(), dfg.get_operands());
+  Cnf cnf(graph.get_nodes("pe"), graph.get_nodes("mem"), graph.get_edges("com"), dfg.get_ninputs(), dfg.output_ids(), dfg.get_operands());
 
   // set option
   {

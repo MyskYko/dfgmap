@@ -6,6 +6,7 @@
 #include <set>
 #include <tuple>
 #include <map>
+#include <fstream>
 
 #include <simp/SimpSolver.h>
 
