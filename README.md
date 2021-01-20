@@ -347,6 +347,6 @@ the loop is entirely unrolled. the data-flow has 138 nodes and produces one outp
 this does not use synthesis option.
 
 #### results
-the mapping requires 52 cycles when N>=3. this is because the program is so sequential that it is difficult to parallelize. run "../dfgmap -a" to reproduce the result. a commandline option "-z" should be used when the result is displayed or visualized because the name of intermediate variable can be very long.
+the mapping requires 52 cycles when N>=2. this is because the program is so sequential that it is difficult to parallelize. run "../dfgmap -a" to reproduce the result. a commandline option "-z" should be used when the result is displayed or visualized because the name of intermediate variable can be very long.
 
 note that generating each problem takes sometime while solving each problem takes just a few seconds.
