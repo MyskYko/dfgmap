@@ -1,11 +1,19 @@
 # dfgmap
+## compile
+```
+git clone --recursive https://github.com/MyskYko/dfgmap.git
+cd dfgmap
+cmake .
+make
+```
+ - the executable "dfgmap" is generated
 ## requirement
- - install a SAT solver you want to use: minisat, glucose, and lingeling are compatible currently
- - install an ILP solver (only compatible with CPLEX) if you want to use
- - install graphviz if you want to generate images of results
+ - modern c++ compiler and cmake
+ - (optional) install a SAT solver if you want to use it externally. minisat, glucose, and lingeling are supported
+ - (optional) install an ILP solver if you want to use it. cplex and gurobi are supported
+ - (optional) install graphviz if you want to generate images of results
  
 ## get started
- - make, then an execuable "./dfgmap" will be generated
  - run the executable without commandline option, this will check the input files:
    - "e.txt" ... array processor
    - "f.txt" ... data-flow
@@ -86,6 +94,13 @@ a processor must be able to process one operator per cycle. in the case that one
 - * a a a
 ```
 
+you can specify a order of operations even when automatic transformation is turned on. after a line ".p", declare the priority among variables using ">", ">=", "<", and "<=". a variable with a larger priority is processed earlier. the automatic transformation is done as far as the variables with their priorities specified are explicitly calculated. For example, when p=a+b and q=c+d, r=p+q can be done as (a+b+c)+d under the associative law. however, if the priority is specified for p and q, both of them must be calculated explicitly, and r is always calculated as p+q. the same applies for multi-node operatoins. this is to prevent problem formulation from becoming complicated.
+```
+.p
+p11 > p12 > p13
+p21 >= p22 >= p23
+```
+
 ### synthesis option
 this file is optional one. the file name is "g.txt", which can be changed by commandline option.
 
@@ -134,18 +149,19 @@ usage : dfgmap <options>
         -o       : toggle generating output image files [default = 0]
         -e <str> : the name of file for array processor [default = "e.txt"]
         -f <str> : the name of file for data-flow [default = "f.txt"]
-        -g <str> : the name of file for synthesis option [default = "g.txt"]
+        -g <str> : the name of file for synthesis option (ignored if not exist) [default = "g.txt"]
         -n <int> : the number of cycles [default = 0]
         -r <int> : the number of registers in each PE (0 means no limit) [default = 2]
-        -u <int> : the number of processors in each PE (0 means no limit) [default = 1]
+        -p <int> : the number of processors in each PE (0 means no limit) [default = 1]
         -t <int> : the number of contexts for pipeline (0 means no pipelining) [default = 0]
         -x       : toggle enabling external memory to store intermediate values [default = 0]
         -c       : toggle transforming dataflow [default = 0]
+        -b       : toggle using xbtree for transfomration [default = 0]
         -m       : toggle using given multi-operator operations [default = 1]
-        -i       : toggle using ILP solver instead of SAT solver [default = 0]
         -y       : toggle post processing to remove redundancy [default = 1]
-        -a       : toggle doing incremental synthesis [default = 0]
-        -z       : toggle naming intermediate variables in the result [default = 1]
+        -a       : toggle increasing cycles when synthesis fails [default = 0]
+        -z       : toggle naming intermadiate variables in the result [default = 1]
+        -q       : toggle optimizing array processor (must use internal glucose) [default = 0]
         -l <str> : the duration of timeout for each problem (0 means no time limit) [default = 1d]
         -d <int> : the type of at most one encoding [default = 3]
                         0 : naive
@@ -153,11 +169,16 @@ usage : dfgmap <options>
                         2 : binary
                         3 : bimander half
                         4 : bimander root
-        -s <int> : SAT solver [default = 0]
+        -s <int> : SAT solver [default = 4]
                         0 : minisat
                         1 : glucose
                         2 : lingeling
                         3 : plingeling
+                        4 : internal glucose
+        -i       : ILP solver [default = 0]
+                        0 : use SAT solver
+                        1 : cplex
+                        2 : gurobi
         -v <int> : the level of verbosing information [default = 0]
                         0 : minimum
                         1 : results
@@ -175,7 +196,7 @@ specify the names of input files: -e for array processor, -f for data-flow, and 
 ### -n
 specifies the number of cycles. 0 (default value) just verifies the input files.
 
-### -r, -u
+### -r, -p
 specify the number of regiters and the number of processors in each PE. all PEs are uniform, where each PE has the same number of registers and the same number of processors. setting 0 imposes no limit.
 
 ### -t
@@ -187,11 +208,11 @@ enables ExtMem to store intermediate values other than input/output variables, w
 ### -c
 optimizes a data-flow under the associative law. the commutative law is also considered. these properties of operation should be specified in the data-flow file.
 
+### -b
+optimization of data-flows is perfomed using xbtree. must be used along with "-c".
+
 ### -m
 utilizes multi-operator operations. this is turned on by default.
-
-### -i
-switches the solver to the ILP solver (CPLEX).
 
 ### -y
 removes redundancy in the result in a deterministic way. the necessary data are marked from the last cycle, where the output variables in ExtMem are marked, to the precedent cycles, where the data that cause the marked data in the next cycle are marked.
@@ -202,6 +223,9 @@ solves the mapping problem with incrementing the number of cycles until the prob
 ### -z
 names intermediate variables according to the operator like "a + b". this is recursively performed, "c * (a + b)" for example. it is turned on by default, but take care that a deep data-flow may cause too long names using GB.
 
+### -q
+reduces PEs and paths in an array processor without increasing the number of cycles. must be used with internal glucose.
+
 ### -l
 sets time limit on solving each problem. this internally uses a linux command "timeout". setting 0 runs the solver without time limit.
 
@@ -209,7 +233,10 @@ sets time limit on solving each problem. this internally uses a linux command "t
 switches encodings of At most one constraint, where only one variable in a set of variables can be one.
 
 ### -s
-switches SAT solvers. make sure that a solver name runs the solver.
+switches SAT solvers. make sure that a solver name runs the solver unless you are using internal glucose.
+
+### -i
+switches the solver to an ILP solver. make sure "cplex" runs CPLEX or "gurobi_cl" runs gurobi.
 
 ### -v
 switches verbosing levels. the level 0 shows the properties of the problem and the result with the elapsed time. the level 1 displays the detailed scheduling in the result. the level 2 shows the configurations of the problem read from the input files. the level 3 shows the solver's output to stdout.
